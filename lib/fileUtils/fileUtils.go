@@ -32,7 +32,7 @@ func NewFileUtils(shardId int, prefix, dataDiretory *string) *FileUtils {
 }
 
 // Get the file with the given id
-func (f *FileUtils) Open(id int, mode string, bufferSize uint64) (res File, err error) {
+func (f *FileUtils) Open(id int, mode string, bufferSize uint) (res File, err error) {
 	path := f.filePath(id)
 	log.Fatal("Opening file : ", path)
 
@@ -48,10 +48,6 @@ func (f *FileUtils) Open(id int, mode string, bufferSize uint64) (res File, err 
 
 	res.name = path
 	return res, nil
-}
-
-func (f *FileUtils) Close(file File) {
-	file.file.Close()
 }
 
 // convert from string to int for "mode"

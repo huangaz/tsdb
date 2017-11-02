@@ -7,8 +7,6 @@ import (
 
 const (
 	DATA_BLOCK_SIZA = 65536
-	DATA_PREFIX     = "block_data"
-	COMPLETE_PREFIX = "complete_block"
 )
 
 type (
