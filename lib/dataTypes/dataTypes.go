@@ -6,11 +6,12 @@ type DataPoint struct {
 }
 
 type DataBlock struct {
-	data [DATA_BLOCK_SIZE]byte
+	Data [DATA_BLOCK_SIZE]byte
 }
 
 const (
 	DATA_BLOCK_SIZE = 65535
+	PAGE_SIZE       = DATA_BLOCK_SIZE
 	DATA_PRE_FIX    = "block_data"
 	COMPLETE_PREFIX = "complete_block"
 )

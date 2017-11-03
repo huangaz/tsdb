@@ -2,11 +2,8 @@ package bucketStorage
 
 import (
 	"github.com/huangaz/tsdb/lib/dataBlockReader"
+	"github.com/huangaz/tsdb/lib/dataTypes"
 	"github.com/huangaz/tsdb/lib/fileUtils"
-)
-
-const (
-	DATA_BLOCK_SIZA = 65536
 )
 
 type (
@@ -41,7 +38,7 @@ type BucketData struct {
 }
 
 type DataBlock struct {
-	data [DATA_BLOCK_SIZA]byte
+	data [dataTypes.DATA_BLOCK_SIZE]byte
 }
 
 func NewBucketData() *BucketData {

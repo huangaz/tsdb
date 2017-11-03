@@ -19,8 +19,8 @@ type FileUtils struct {
 }
 
 type File struct {
-	file *os.File
-	name string
+	File *os.File
+	Name string
 }
 
 func NewFileUtils(shardId int, prefix, dataDiretory *string) *FileUtils {
@@ -41,12 +41,12 @@ func (f *FileUtils) Open(id int, mode string, bufferSize uint) (res File, err er
 		return res, err
 	}
 
-	res.file, err = os.OpenFile(path, flag, 0777)
+	res.File, err = os.OpenFile(path, flag, 0777)
 	if err != nil {
 		return res, err
 	}
 
-	res.name = path
+	res.Name = path
 	return res, nil
 }
 
@@ -151,7 +151,7 @@ func (f *FileUtils) CreateDirectories() error {
 }
 
 func (f *FileUtils) Close(fileToClose File) error {
-	err := fileToClose.file.Close()
+	err := fileToClose.File.Close()
 	if err != nil {
 		return err
 	}
