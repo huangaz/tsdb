@@ -4,6 +4,7 @@
 package dataBlockReader
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -55,20 +56,30 @@ func (d *DataBlockReader) ReadBlocks(position uint) (pointers [](*dataTypes.Data
 	activePages := binary.BigEndian.Uint32(buffer[:4])
 	buffer = buffer[4:]
 
-	expectedLength := 4 + 4 + count*4 + count*8 + activePages*dataTypes.PAGE_SIZE
+	expectedLength := int(4 + 4 + count*4 + count*8 + activePages*dataTypes.PAGE_SIZE)
 	if len != expectedLength {
 		errString := fmt.Sprintf("Corrupt data file: expected %d bytes, got %d bytes.", expectedLength, len)
 		err = errors.New(errString + f.Name)
 		return pointers, nil, nil, err
 	}
-	copy(timeSeriesIds, buffer[:count*4+1])
+
+	err = binary.Read(bytes.NewReader(buffer[:count*4+1]), binary.BigEndian, timeSeriesIds)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	buffer = buffer[count*4+1:]
-	copy(storageIds, buffer[:count*4+1])
+	err = binary.Read(bytes.NewReader(buffer[:count*4+1]), binary.BigEndian, storageIds)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	buffer = buffer[count*4+1:]
 
 	newDataBlock := new(dataTypes.DataBlock)
-	for i := 0; i < activePages; i++ {
-		copy(newDataBlock.Data, buffer[:dataTypes.PAGE_SIZE+1])
+	for i := uint32(0); i < activePages; i++ {
+		err = binary.Read(bytes.NewReader(buffer[:dataTypes.PAGE_SIZE+1]), binary.BigEndian, newDataBlock.Data)
+		if err != nil {
+			return nil, nil, nil, err
+		}
 		buffer = buffer[dataTypes.PAGE_SIZE+1:]
 		pointers = append(pointers, newDataBlock)
 	}
@@ -77,7 +88,7 @@ func (d *DataBlockReader) ReadBlocks(position uint) (pointers [](*dataTypes.Data
 }
 
 // Returns the file ids for the completed blocks
-func (d *DataBlockReader) findCompletedBlockFiles() ([]int, error) {
+func (d *DataBlockReader) FindCompletedBlockFiles() ([]int, error) {
 	files, err := d.completedFiles_.Ls()
 	return files, err
 }

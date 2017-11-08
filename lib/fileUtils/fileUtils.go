@@ -5,7 +5,6 @@ package fileUtils
 import (
 	"errors"
 	"io/ioutil"
-	"log"
 	"math"
 	"os"
 	"sort"
@@ -33,10 +32,10 @@ func NewFileUtils(shardId int, prefix, dataDiretory *string) *FileUtils {
 
 // Get the file with the given id
 func (f *FileUtils) Open(id int, mode string, bufferSize uint) (res File, err error) {
-	path := f.filePath(id)
-	log.Fatal("Opening file : ", path)
+	path := f.FilePath(id)
+	//log.Fatal("Opening file : ", path)
 
-	flag, err := f.mode_Atoi(mode)
+	flag, err := f.Mode_Atoi(mode)
 	if err != nil {
 		return res, err
 	}
@@ -51,7 +50,7 @@ func (f *FileUtils) Open(id int, mode string, bufferSize uint) (res File, err er
 }
 
 // convert from string to int for "mode"
-func (f *FileUtils) mode_Atoi(mode string) (flag int, err error) {
+func (f *FileUtils) Mode_Atoi(mode string) (flag int, err error) {
 	switch mode {
 	case "w":
 		flag = os.O_WRONLY
@@ -65,7 +64,7 @@ func (f *FileUtils) mode_Atoi(mode string) (flag int, err error) {
 	return flag, err
 }
 
-func (f *FileUtils) filePath(id int) string {
+func (f *FileUtils) FilePath(id int) string {
 	return f.directory_ + "/" + f.prefix_ + "." + strconv.Itoa(id)
 }
 
@@ -96,7 +95,7 @@ func (f *FileUtils) ClearAll() error {
 
 // Remove a file with the given id.
 func (f *FileUtils) remove(id int) error {
-	path := f.directory_ + "/" + f.prefix_ + "." + strconv.Itoa(id)
+	path := f.FilePath(id)
 	err := os.Remove(path)
 	if err != nil {
 		return err
@@ -132,8 +131,8 @@ func (f *FileUtils) Ls() (ids []int, err error) {
 
 // Replace a file with another.
 func (f *FileUtils) Rename(from, to int) error {
-	originalPath := f.filePath(from)
-	newPath := f.filePath(to)
+	originalPath := f.FilePath(from)
+	newPath := f.FilePath(to)
 	err := os.Rename(originalPath, newPath)
 	if err != nil {
 		return err
@@ -143,7 +142,7 @@ func (f *FileUtils) Rename(from, to int) error {
 
 // Creates directories. Must be called before other file operations are used
 func (f *FileUtils) CreateDirectories() error {
-	err := os.Mkdir(f.directory_, 0755)
+	err := os.MkdirAll(f.directory_, 0755)
 	if err != nil {
 		return err
 	}
