@@ -41,11 +41,11 @@ func (d *DataBlockReader) ReadBlocks(position uint) (pointers [](*dataTypes.Data
 	if err != nil {
 		return pointers, nil, nil, err
 	}
-	len := len(buffer)
-	if len == 0 {
+	length := len(buffer)
+	if length == 0 {
 		err = errors.New("Empty data file" + f.Name)
 		return pointers, nil, nil, err
-	} else if len < 8 {
+	} else if length < 8 {
 		// the length of 2 uint32
 		err = errors.New("Not enough data" + f.Name)
 		return pointers, nil, nil, err
@@ -56,31 +56,38 @@ func (d *DataBlockReader) ReadBlocks(position uint) (pointers [](*dataTypes.Data
 	activePages := binary.BigEndian.Uint32(buffer[:4])
 	buffer = buffer[4:]
 
-	expectedLength := int(4 + 4 + count*4 + count*8 + activePages*dataTypes.PAGE_SIZE)
-	if len != expectedLength {
-		errString := fmt.Sprintf("Corrupt data file: expected %d bytes, got %d bytes.", expectedLength, len)
+	lengthOfTimeSeriesIds := 4 * count
+	lengthOfStorageIds := 8 * count
+
+	expectedLength := int(4 + 4 + lengthOfTimeSeriesIds + lengthOfStorageIds + activePages*dataTypes.PAGE_SIZE)
+	if length != expectedLength {
+		errString := fmt.Sprintf("Corrupt data file: expected %d bytes, got %d bytes.", expectedLength, length)
 		err = errors.New(errString + f.Name)
 		return pointers, nil, nil, err
 	}
 
-	err = binary.Read(bytes.NewReader(buffer[:count*4+1]), binary.BigEndian, timeSeriesIds)
+	timeSeriesIds = make([]uint32, count)
+	err = binary.Read(bytes.NewReader(buffer[:lengthOfTimeSeriesIds]), binary.BigEndian, timeSeriesIds)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	buffer = buffer[count*4+1:]
-	err = binary.Read(bytes.NewReader(buffer[:count*4+1]), binary.BigEndian, storageIds)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	buffer = buffer[count*4+1:]
+	buffer = buffer[lengthOfTimeSeriesIds:]
 
-	newDataBlock := new(dataTypes.DataBlock)
+	storageIds = make([]uint64, count)
+	err = binary.Read(bytes.NewReader(buffer[:lengthOfStorageIds]), binary.BigEndian, storageIds)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	buffer = buffer[lengthOfStorageIds:]
+
+	DataBlockBuffer := [dataTypes.PAGE_SIZE]byte{}
 	for i := uint32(0); i < activePages; i++ {
-		err = binary.Read(bytes.NewReader(buffer[:dataTypes.PAGE_SIZE+1]), binary.BigEndian, newDataBlock.Data)
+		err = binary.Read(bytes.NewReader(buffer[:dataTypes.PAGE_SIZE]), binary.BigEndian, &DataBlockBuffer)
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		buffer = buffer[dataTypes.PAGE_SIZE+1:]
+		buffer = buffer[dataTypes.PAGE_SIZE:]
+		newDataBlock := &dataTypes.DataBlock{Data: DataBlockBuffer}
 		pointers = append(pointers, newDataBlock)
 	}
 
