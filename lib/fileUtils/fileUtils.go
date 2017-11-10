@@ -79,7 +79,7 @@ func (f *FileUtils) ClearTo(targetId int) error {
 		if id >= targetId {
 			return nil
 		}
-		if err := f.remove(id); err != nil {
+		if err := f.Remove(id); err != nil {
 			return err
 		}
 	}
@@ -94,7 +94,7 @@ func (f *FileUtils) ClearAll() error {
 }
 
 // Remove a file with the given id.
-func (f *FileUtils) remove(id int) error {
+func (f *FileUtils) Remove(id int) error {
 	path := f.FilePath(id)
 	err := os.Remove(path)
 	if err != nil {

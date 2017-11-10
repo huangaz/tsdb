@@ -121,7 +121,7 @@ func TestClearAll(t *testing.T) {
 func TestRemove(t *testing.T) {
 	create(1)
 	defer delete()
-	err := f.remove(1)
+	err := f.Remove(1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +130,7 @@ func TestRemove(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(get) != 0 {
-		t.Error(`remove() failed!`)
+		t.Error(`Remove() failed!`)
 	}
 }
 

@@ -35,6 +35,8 @@ type Series struct {
 	prevValueRead    float64
 	prevLeadingRead  uint64
 	prevTrailingRead uint64
+
+	extraData uint16
 }
 
 type timestampEncoding struct {
@@ -244,4 +246,17 @@ func (s *Series) readNextValue() (float64, error) {
 	value := math.Float64frombits(xorValue ^ math.Float64bits(s.prevValueRead))
 	s.prevValueRead = value
 	return value, nil
+}
+
+func (s *Series) Reset() {
+	s.Bs.Stream = s.Bs.Stream[:0]
+	s.Bs.NumBits = 0
+	s.prevTimeDeltaRead = 0
+	s.prevTimeDeltaWrite = 0
+	s.prevValueRead = 0
+	s.prevValueWrite = 0
+	s.prevLeadingRead = 0
+	s.prevLeadingWrite = 0
+	s.prevTrailingRead = 0
+	s.prevTrailingWrite = 0
 }

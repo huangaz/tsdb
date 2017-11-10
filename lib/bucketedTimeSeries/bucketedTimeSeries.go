@@ -4,11 +4,13 @@ import (
 	"errors"
 	"github.com/huangaz/tsdb/lib/dataTypes"
 	"github.com/huangaz/tsdb/lib/timeSeriesStream"
+	"math"
 )
 
 const (
 	// Values coming in faster than this are considered spam.
 	MIN_TIMESERIES_DELTA = 30
+	DEFAULT_CATEGORY     = 0
 )
 
 type BucketedTimeSeries struct {
@@ -17,15 +19,25 @@ type BucketedTimeSeries struct {
 	// Number of points in the active bucket (stream_)
 	count_ uint16
 	// Currently active bucket
-	current_ uint32
-}
-
-func (b *BucketedTimeSeries) GetInfo() (count uint16) {
-	return b.count_
+	current_          uint32
+	queriedBucketsAgo uint8
 }
 
 func NewBucketedTimeSeries() *BucketedTimeSeries {
 	return &BucketedTimeSeries{}
+}
+
+func (b *BucketedTimeSeries) Reset(n uint8) {
+	b.queriedBucketsAgo = math.MaxUint8
+	//lock_Init()
+	b.current_ = 0
+	//blocks_.reset()
+	b.count_ = 0
+	b.stream_.Reset()
+}
+
+func (b *BucketedTimeSeries) GetInfo() (count uint16) {
+	return b.count_
 }
 
 func (b *BucketedTimeSeries) Put(i, timeseriesId uint32, dp dataTypes.DataPoint) error {
