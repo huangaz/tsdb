@@ -2,19 +2,20 @@ package dataBlockReader
 
 import (
 	"encoding/binary"
-	"fmt"
 	"github.com/huangaz/tsdb/lib/dataTypes"
+	"github.com/huangaz/tsdb/lib/testUtil"
 	"os"
-	"strconv"
 	"testing"
 )
 
 var (
-	dataDirectory_Test  = "/tmp/path_test"
-	shardDirectory_Test = dataDirectory_Test + "/1"
-	d                   = NewDataBlockReader(1, &dataDirectory_Test)
+	// dataDirectory_Test  = "/tmp/path_test"
+	// shardDirectory_Test = dataDirectory_Test + "/1"
+	d = NewDataBlockReader(1, &testUtil.DataDirectory_Test)
+	//d = NewDataBlockReader(1, &dataDirectory_Test)
 )
 
+/*
 func create(numOfFile int) {
 	err := os.MkdirAll(shardDirectory_Test, 0777)
 	if err != nil {
@@ -37,10 +38,13 @@ func delete() {
 		return
 	}
 }
+*/
 
 func TestFindCompletedBlockFiles(t *testing.T) {
-	create(10)
-	defer delete()
+	// create(10)
+	testUtil.FileCreate(10)
+	// defer delete()
+	defer testUtil.FileDelete()
 	get, err := d.FindCompletedBlockFiles()
 	if err != nil {
 		t.Fatal(err)
@@ -58,9 +62,11 @@ func TestFindCompletedBlockFiles(t *testing.T) {
 }
 
 func TestReadBlocks(t *testing.T) {
-	filePath := shardDirectory_Test + "/" + dataTypes.DATA_PRE_FIX + ".1"
-	create(1)
+	filePath := testUtil.ShardDirectory_Test + "/" + dataTypes.DATA_PRE_FIX + ".1"
+	// create(1)
 	// defer delete()
+	testUtil.FileCreate(1)
+	defer testUtil.FileDelete()
 
 	// test for empty file
 	_, _, _, err := d.ReadBlocks(1)
