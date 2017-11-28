@@ -56,7 +56,7 @@ func TestStoreAndFetch(t *testing.T) {
 		t.Fatal("Invalid id!")
 	}
 
-	resData, count, err := b.fetch(11, id)
+	resData, count, err := b.Fetch(11, id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +179,7 @@ func TestFinalizedAndLoad(t *testing.T) {
 	}
 
 	for _, id := range storageIds {
-		resData, count, err := b2.fetch(1, id)
+		resData, count, err := b2.Fetch(1, id)
 		if err != nil {
 			t.Fatal(err)
 		}

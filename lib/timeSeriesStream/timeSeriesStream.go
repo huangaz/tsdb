@@ -36,7 +36,7 @@ type Series struct {
 	prevLeadingRead  uint64
 	prevTrailingRead uint64
 
-	extraData uint16
+	ExtraData uint16
 }
 
 type timestampEncoding struct {
@@ -259,4 +259,8 @@ func (s *Series) Reset() {
 	s.prevLeadingWrite = 0
 	s.prevTrailingRead = 0
 	s.prevTrailingWrite = 0
+}
+
+func (s *Series) ReadData() []byte {
+	return s.Bs.Stream
 }

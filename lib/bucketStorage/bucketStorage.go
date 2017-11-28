@@ -234,7 +234,7 @@ func (b *BucketStorage) createId(pageIndex, pageOffset uint32, dataLength, itemC
 
 // Fetches data.
 // fill `data` and return `itemCount`,
-func (b *BucketStorage) fetch(position uint32, id uint64) (data []byte, itemCount uint16, err error) {
+func (b *BucketStorage) Fetch(position uint32, id uint64) (data []byte, itemCount uint16, err error) {
 	if id == INVALID_ID {
 		err = errors.New("Invalid ID!")
 		return nil, itemCount, err

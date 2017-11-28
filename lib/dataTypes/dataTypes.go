@@ -9,6 +9,11 @@ type DataBlock struct {
 	Data [DATA_BLOCK_SIZE]byte
 }
 
+type TimeSeriesBlock struct {
+	Count uint16
+	Data  []byte
+}
+
 const (
 	DATA_BLOCK_SIZE = 65535
 	PAGE_SIZE       = DATA_BLOCK_SIZE
