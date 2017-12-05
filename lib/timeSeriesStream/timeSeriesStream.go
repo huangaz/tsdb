@@ -60,6 +60,8 @@ var timestampEncodings = []timestampEncoding{
 	{32, 15, 4},
 }
 
+// Appends a (timestamp, value) pair to the current stream.
+// minTimestampDelta is the minimum timestamp delta
 func (s *Series) Append(timestamp uint64, value float64, minTimestampDelta int64) error {
 	if err := s.appendTimestamp(timestamp, minTimestampDelta); err != nil {
 		return err
@@ -79,15 +81,23 @@ func (s *Series) Read() (timestamp uint64, value float64, err error) {
 }
 
 // timestamp:0-4294967295
+// Store a delta of delta for the rest of the values in one of the
+// following ways
+//
+// '0' = delta of delta did not change
+// '10' followed by a value length of 7
+// '110' followed by a value length of 9
+// '1110' followed by a value length of 12
+// '1111' followed by a value length of 32
 func (s *Series) appendTimestamp(timestamp uint64, minTimestampDelta int64) error {
 	delta := int64(timestamp - s.prevTimeWrite)
+	// Skip the minTimestampDelta check for the first timestamp.
 	if delta < minTimestampDelta && s.prevTimeWrite != 0 {
-		var err = errors.New("delta is smaller than minTimestampDelta")
-		return err
+		return errors.New("Timestamp delta is smaller than minTimestampDelta!")
 	}
 
 	if len(s.Bs.Stream) == 0 {
-		//store the first timestamp
+		// Store the first timestamp
 		s.Bs.AddValueToBitStream(timestamp, BITS_FOR_FIRST_TIMESTAMP)
 		s.prevTimeWrite = timestamp
 		s.prevTimeDeltaWrite = DEFAULT_DELTA
@@ -111,7 +121,8 @@ func (s *Series) appendTimestamp(timestamp uint64, minTimestampDelta int64) erro
 
 	for i := 0; i < 4; i++ {
 		if absValue < (1 << uint(timestampEncodings[i].bitsForValue-1)) {
-			s.Bs.AddValueToBitStream(timestampEncodings[i].controlValue, timestampEncodings[i].controlValueBitLength)
+			s.Bs.AddValueToBitStream(timestampEncodings[i].controlValue,
+				timestampEncodings[i].controlValueBitLength)
 			// Make this value between [0, 2^timestampEncodings[i].bitsForValue - 1]
 			encodedValue := uint64(deltaOfDelta + (1 << uint(timestampEncodings[i].bitsForValue-1)))
 			s.Bs.AddValueToBitStream(encodedValue, timestampEncodings[i].bitsForValue)
@@ -128,12 +139,12 @@ func (s *Series) readNextTimestamp() (uint64, error) {
 	// first timestamp
 	if s.Bs.BitPos == 0 {
 		s.prevTimeDeltaRead = DEFAULT_DELTA
-		if timestamp, err := s.Bs.ReadValueFromBitStream(BITS_FOR_FIRST_TIMESTAMP); err != nil {
+		timestamp, err := s.Bs.ReadValueFromBitStream(BITS_FOR_FIRST_TIMESTAMP)
+		if err != nil {
 			return 0, err
-		} else {
-			s.prevTimeRead = timestamp
-			return timestamp, nil
 		}
+		s.prevTimeRead = timestamp
+		return timestamp, nil
 	}
 
 	index, err := s.Bs.FindTheFirstZeroBit(4)
@@ -162,6 +173,22 @@ func (s *Series) readNextTimestamp() (uint64, error) {
 	return s.prevTimeRead, nil
 }
 
+// Values are encoded by XORing them with the previous value. If
+// XORing results in a zero value (value is the same as the previous
+// value), only a single zero bit is stored, otherwise 1 bit is
+// stored.
+//
+// For non-zero XORred results, there are two choices:
+//
+// 1) If the block of meaningful bits falls in between the block of
+//    previous meaningful bits, i.e., there are at least as many
+//    leading zeros and as many trailing zeros as with the previous
+//    value, use that information for the block position and just
+//    store the XORred value.
+//
+// 2) Length of the number of leading zeros is stored in the next 5
+//    bits, then length of the XORred value is stored in the next 6
+//    bits and finally the XORred value is stored.
 func (s *Series) appendValue(value float64) {
 	xorWithPrev := math.Float64bits(value) ^ math.Float64bits(s.prevValueWrite)
 	if xorWithPrev == 0 {
@@ -171,7 +198,7 @@ func (s *Series) appendValue(value float64) {
 		s.Bs.AddValueToBitStream(1, 1)
 	}
 
-	// calculate the numbers of leading and trailing zeros
+	// Calculate the numbers of leading and trailing zeros
 	leading := bitUtil.Clz(xorWithPrev)
 	trailing := bitUtil.Ctz(xorWithPrev)
 
@@ -184,15 +211,15 @@ func (s *Series) appendValue(value float64) {
 	prevBolckInformationSize := 64 - s.prevLeadingWrite - s.prevTrailingWrite
 
 	if leading >= s.prevLeadingWrite && trailing >= s.prevTrailingWrite && prevBolckInformationSize < expectedSize {
-		//Control bit for using previous block information.
+		// Control bit for using previous block information.
 		s.Bs.AddValueToBitStream(1, 1)
 		blockValue := xorWithPrev >> s.prevTrailingWrite
 		s.Bs.AddValueToBitStream(blockValue, prevBolckInformationSize)
 	} else {
-		//Control bit for not using previous block information.
+		// Control bit for not using previous block information.
 		s.Bs.AddValueToBitStream(0, 1)
 		s.Bs.AddValueToBitStream(leading, LEADING_ZEROS_LENGTH_BITS)
-		//To fit in 6 bits. There will never be a zero size block
+		// To fit in 6 bits. There will never be a zero size block
 		s.Bs.AddValueToBitStream(blockSize-BLOCK_SIZE_ADJUSTMENT, BLOCK_SIZE_LENGTH_BITS)
 		blockValue := xorWithPrev >> trailing
 		s.Bs.AddValueToBitStream(blockValue, blockSize)
@@ -251,6 +278,7 @@ func (s *Series) readNextValue() (float64, error) {
 func (s *Series) Reset() {
 	s.Bs.Stream = s.Bs.Stream[:0]
 	s.Bs.NumBits = 0
+	s.Bs.BitPos = 0
 	s.prevTimeDeltaRead = 0
 	s.prevTimeDeltaWrite = 0
 	s.prevValueRead = 0
