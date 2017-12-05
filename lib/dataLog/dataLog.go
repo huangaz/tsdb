@@ -1,4 +1,4 @@
-package DataLog
+package dataLog
 
 import (
 	"bytes"

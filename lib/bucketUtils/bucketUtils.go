@@ -1,4 +1,4 @@
-package BucketUtils
+package bucketUtils
 
 import (
 	"errors"
