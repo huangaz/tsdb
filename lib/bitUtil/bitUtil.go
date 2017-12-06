@@ -22,7 +22,7 @@ func (b BitStream) String() string {
 }
 */
 
-// Adds a value to a bit stream. `bitsInValue` specifies the number
+// Add a value to a bit stream. `bitsInValue` specifies the number
 // of least significant bits that will be added to the bit
 // stream. The bits from `value` will be added from the most
 // significant bit to the least significant bit.

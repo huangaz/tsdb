@@ -15,31 +15,6 @@ var (
 	//d = NewDataBlockReader(1, &dataDirectory_Test)
 )
 
-/*
-func create(numOfFile int) {
-	err := os.MkdirAll(shardDirectory_Test, 0777)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	for i := 1; i <= numOfFile; i++ {
-		dataFile_Test := shardDirectory_Test + "/" + dataTypes.DATA_PRE_FIX + "." + strconv.Itoa(i)
-		completeFile_Test := shardDirectory_Test + "/" + dataTypes.COMPLETE_PREFIX + "." + strconv.Itoa(i)
-		os.Create(dataFile_Test)
-		os.Create(completeFile_Test)
-	}
-}
-
-func delete() {
-	err := os.RemoveAll(dataDirectory_Test)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-}
-*/
-
 func TestFindCompletedBlockFiles(t *testing.T) {
 	// create(10)
 	testUtil.FileCreate(10)
@@ -70,13 +45,13 @@ func TestReadBlocks(t *testing.T) {
 
 	// test for empty file
 	_, _, _, err := d.ReadBlocks(1)
-	want := "Empty data file" + filePath
+	want := "Empty data file: " + filePath
 	if err == nil || err.Error() != want {
 		t.Fatalf("wrong error message for empty file!\n want: %v\n get : %v", want, err.Error())
 	}
 
 	//test for too short file
-	f, err := d.dataFiles_.Open(1, "w", 0)
+	f, err := d.dataFiles_.Open(1, "w")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +61,7 @@ func TestReadBlocks(t *testing.T) {
 
 	f.File.Write(byteSlice)
 	_, _, _, err = d.ReadBlocks(1)
-	want = "Not enough data" + filePath
+	want = "Not enough data: " + filePath
 	if err == nil || err.Error() != want {
 		t.Fatalf("wrong error message for short file!\n want: %v\n get : %v", want, err.Error())
 	}
@@ -96,7 +71,7 @@ func TestReadBlocks(t *testing.T) {
 	binary.BigEndian.PutUint32(byteSlice, uint32(1))
 	f.File.Write(byteSlice)
 	_, _, _, err = d.ReadBlocks(1)
-	want = "Corrupt data file: expected 65555 bytes, got 8 bytes." + filePath
+	want = "Corrupt data file: expected 65555 bytes, got 8 bytes. " + filePath
 	if err == nil || err.Error() != want {
 		t.Fatalf("wrong error message for corrupt file!\n want: %v\n get : %v", want, err.Error())
 	}

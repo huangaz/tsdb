@@ -1,3 +1,4 @@
+// This class operates on a stream of TimeSeries Data (timestamp, value)
 package timeSeriesStream
 
 import (
@@ -70,6 +71,7 @@ func (s *Series) Append(timestamp uint64, value float64, minTimestampDelta int64
 	return nil
 }
 
+// Read a (timestamp, value) pair from the current stream.
 func (s *Series) Read() (timestamp uint64, value float64, err error) {
 	if timestamp, err = s.readNextTimestamp(); err != nil {
 		return 0, 0, err
@@ -80,6 +82,7 @@ func (s *Series) Read() (timestamp uint64, value float64, err error) {
 	return
 }
 
+// Append a timestamp in the current stream.
 // timestamp:0-4294967295
 // Store a delta of delta for the rest of the values in one of the
 // following ways
@@ -135,6 +138,7 @@ func (s *Series) appendTimestamp(timestamp uint64, minTimestampDelta int64) erro
 	return nil
 }
 
+// Read a timestamp fron the current stream.
 func (s *Series) readNextTimestamp() (uint64, error) {
 	// first timestamp
 	if s.Bs.BitPos == 0 {
@@ -173,6 +177,7 @@ func (s *Series) readNextTimestamp() (uint64, error) {
 	return s.prevTimeRead, nil
 }
 
+// Append a value in the current stream
 // Values are encoded by XORing them with the previous value. If
 // XORing results in a zero value (value is the same as the previous
 // value), only a single zero bit is stored, otherwise 1 bit is
@@ -229,6 +234,7 @@ func (s *Series) appendValue(value float64) {
 	s.prevValueWrite = value
 }
 
+// Read a value from the current stream.
 func (s *Series) readNextValue() (float64, error) {
 	nonZeroValue, err := s.Bs.ReadValueFromBitStream(1)
 	if err != nil {
@@ -275,6 +281,7 @@ func (s *Series) readNextValue() (float64, error) {
 	return value, nil
 }
 
+// Reset Series.
 func (s *Series) Reset() {
 	s.Bs.Stream = s.Bs.Stream[:0]
 	s.Bs.NumBits = 0
@@ -289,6 +296,7 @@ func (s *Series) Reset() {
 	s.prevTrailingWrite = 0
 }
 
+// Return the stream as a byte slice.
 func (s *Series) ReadData() []byte {
 	return s.Bs.Stream
 }

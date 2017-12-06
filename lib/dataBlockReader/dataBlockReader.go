@@ -1,6 +1,3 @@
-// Returns allocated blocks for every page in the given position.
-// Fills in timeSeriesIds and storageIds with the metadata associated with
-// the blocks.
 package dataBlockReader
 
 import (
@@ -30,8 +27,9 @@ func NewDataBlockReader(shardId int, dataDiretory *string) *DataBlockReader {
 // Returns allocated blocks for every page in the given position.
 // Fills in timeSeriesIds and storageIds with the metadata associated with
 // the blocks.
-func (d *DataBlockReader) ReadBlocks(position uint) (pointers [](*dataTypes.DataBlock), timeSeriesIds []uint32, storageIds []uint64, err error) {
-	f, err := d.dataFiles_.Open(int(position), "r", 0)
+func (d *DataBlockReader) ReadBlocks(position uint) (pointers [](*dataTypes.DataBlock),
+	timeSeriesIds []uint32, storageIds []uint64, err error) {
+	f, err := d.dataFiles_.Open(int(position), "r")
 	if err != nil {
 		return pointers, nil, nil, err
 	}
@@ -43,11 +41,11 @@ func (d *DataBlockReader) ReadBlocks(position uint) (pointers [](*dataTypes.Data
 	}
 	length := len(buffer)
 	if length == 0 {
-		err = errors.New("Empty data file" + f.Name)
+		err = errors.New("Empty data file: " + f.Name)
 		return pointers, nil, nil, err
 	} else if length < 8 {
 		// the length of 2 uint32
-		err = errors.New("Not enough data" + f.Name)
+		err = errors.New("Not enough data: " + f.Name)
 		return pointers, nil, nil, err
 	}
 
@@ -59,15 +57,19 @@ func (d *DataBlockReader) ReadBlocks(position uint) (pointers [](*dataTypes.Data
 	lengthOfTimeSeriesIds := 4 * count
 	lengthOfStorageIds := 8 * count
 
-	expectedLength := int(4 + 4 + lengthOfTimeSeriesIds + lengthOfStorageIds + activePages*dataTypes.PAGE_SIZE)
+	// uint32 + uint32 + count*uint32 + count * uint64 + activePages * PAGE_SIZE
+	expectedLength := int(4 + 4 + lengthOfTimeSeriesIds + lengthOfStorageIds +
+		activePages*dataTypes.PAGE_SIZE)
 	if length != expectedLength {
-		errString := fmt.Sprintf("Corrupt data file: expected %d bytes, got %d bytes.", expectedLength, length)
+		errString := fmt.Sprintf("Corrupt data file: expected %d bytes, got %d bytes. ",
+			expectedLength, length)
 		err = errors.New(errString + f.Name)
 		return pointers, nil, nil, err
 	}
 
 	timeSeriesIds = make([]uint32, count)
-	err = binary.Read(bytes.NewReader(buffer[:lengthOfTimeSeriesIds]), binary.BigEndian, timeSeriesIds)
+	err = binary.Read(bytes.NewReader(buffer[:lengthOfTimeSeriesIds]), binary.BigEndian,
+		timeSeriesIds)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -82,7 +84,8 @@ func (d *DataBlockReader) ReadBlocks(position uint) (pointers [](*dataTypes.Data
 
 	DataBlockBuffer := [dataTypes.PAGE_SIZE]byte{}
 	for i := uint32(0); i < activePages; i++ {
-		err = binary.Read(bytes.NewReader(buffer[:dataTypes.PAGE_SIZE]), binary.BigEndian, &DataBlockBuffer)
+		err = binary.Read(bytes.NewReader(buffer[:dataTypes.PAGE_SIZE]), binary.BigEndian,
+			&DataBlockBuffer)
 		if err != nil {
 			return nil, nil, nil, err
 		}

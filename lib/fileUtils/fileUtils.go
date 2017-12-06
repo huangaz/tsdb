@@ -22,9 +22,10 @@ type File struct {
 	Name string
 }
 
-func NewFileUtils(shardId int, prefix, dataDiretory *string) *FileUtils {
+// Return a new FileUtils with the given shardId, prefix and dataDirectory
+func NewFileUtils(shardId int, prefix, dataDirectory *string) *FileUtils {
 	res := new(FileUtils)
-	res.directory_ = *dataDiretory
+	res.directory_ = *dataDirectory
 	res.prefix_ = *prefix
 	res.directory_ = res.directory_ + "/" + strconv.Itoa(shardId)
 	return res
@@ -48,7 +49,7 @@ func (f *FileUtils) Open(id int, mode string) (res File, err error) {
 	return res, nil
 }
 
-// Convert from string to int for "mode"
+// Convert from string to int for "mode" in os.OpenFile()
 func (f *FileUtils) Mode_Atoi(mode string) (flag int, err error) {
 	switch mode {
 	case "w":
@@ -63,6 +64,7 @@ func (f *FileUtils) Mode_Atoi(mode string) (flag int, err error) {
 	return flag, err
 }
 
+// Return the file path as a string with the given id.
 func (f *FileUtils) FilePath(id int) string {
 	return f.directory_ + "/" + f.prefix_ + "." + strconv.Itoa(id)
 }
@@ -85,6 +87,7 @@ func (f *FileUtils) ClearTo(targetId int) error {
 	return nil
 }
 
+// Clear all files.
 func (f *FileUtils) ClearAll() error {
 	if err := f.ClearTo(math.MaxInt64); err != nil {
 		return err
@@ -148,6 +151,7 @@ func (f *FileUtils) CreateDirectories() error {
 	return nil
 }
 
+// Close file.
 func (f *FileUtils) Close(fileToClose File) error {
 	err := fileToClose.File.Close()
 	if err != nil {
