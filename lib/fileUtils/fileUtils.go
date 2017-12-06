@@ -1,4 +1,4 @@
-// this package is a tool to manage groups of files of the form
+// Tools to manage groups of files of the form
 // <path to data>/shardID/prefix.xxxx
 package fileUtils
 
@@ -31,9 +31,8 @@ func NewFileUtils(shardId int, prefix, dataDiretory *string) *FileUtils {
 }
 
 // Get the file with the given id
-func (f *FileUtils) Open(id int, mode string, bufferSize uint) (res File, err error) {
+func (f *FileUtils) Open(id int, mode string) (res File, err error) {
 	path := f.FilePath(id)
-	//log.Fatal("Opening file : ", path)
 
 	flag, err := f.Mode_Atoi(mode)
 	if err != nil {
@@ -49,7 +48,7 @@ func (f *FileUtils) Open(id int, mode string, bufferSize uint) (res File, err er
 	return res, nil
 }
 
-// convert from string to int for "mode"
+// Convert from string to int for "mode"
 func (f *FileUtils) Mode_Atoi(mode string) (flag int, err error) {
 	switch mode {
 	case "w":
@@ -68,7 +67,7 @@ func (f *FileUtils) FilePath(id int) string {
 	return f.directory_ + "/" + f.prefix_ + "." + strconv.Itoa(id)
 }
 
-// Remove all files with id less than this
+// Remove all files with id less than targetId
 func (f *FileUtils) ClearTo(targetId int) error {
 	ids, err := f.Ls()
 	if err != nil {
@@ -129,7 +128,7 @@ func (f *FileUtils) Ls() (ids []int, err error) {
 	return ids, nil
 }
 
-// Replace a file with another.
+// Rename a file.
 func (f *FileUtils) Rename(from, to int) error {
 	originalPath := f.FilePath(from)
 	newPath := f.FilePath(to)

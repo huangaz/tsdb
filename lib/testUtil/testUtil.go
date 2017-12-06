@@ -8,6 +8,8 @@ import (
 )
 
 var (
+	DataPrefix          = dataTypes.DATA_PRE_FIX
+	CompletePrefix      = dataTypes.COMPLETE_PREFIX
 	DataDirectory_Test  = "/tmp/path_test"
 	ShardDirectory_Test = DataDirectory_Test + "/1"
 )
@@ -20,8 +22,8 @@ func FileCreate(numOfFile int) {
 	}
 
 	for i := 1; i <= numOfFile; i++ {
-		dataFile_Test := ShardDirectory_Test + "/" + dataTypes.DATA_PRE_FIX + "." + strconv.Itoa(i)
-		completeFile_Test := ShardDirectory_Test + "/" + dataTypes.COMPLETE_PREFIX + "." + strconv.Itoa(i)
+		dataFile_Test := ShardDirectory_Test + "/" + DataPrefix + "." + strconv.Itoa(i)
+		completeFile_Test := ShardDirectory_Test + "/" + CompletePrefix + "." + strconv.Itoa(i)
 		os.Create(dataFile_Test)
 		os.Create(completeFile_Test)
 	}
