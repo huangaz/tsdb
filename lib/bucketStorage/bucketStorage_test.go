@@ -131,7 +131,7 @@ func TestStoreToExpiredBucket(t *testing.T) {
 	testData := []byte(testString)
 
 	for i := 1; i < 10; i++ {
-		id, err := b.Store(uint32(i), testData, 100, 0)
+		id, err := b.Store(uint32(i), testData, 100+uint16(i), 0)
 		if err != nil {
 			t.Fatal(err)
 		}

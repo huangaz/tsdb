@@ -29,6 +29,7 @@ func NewDataBlockReader(shardId int, dataDiretory *string) *DataBlockReader {
 // the blocks.
 func (d *DataBlockReader) ReadBlocks(position uint) (pointers [](*dataTypes.DataBlock),
 	timeSeriesIds []uint32, storageIds []uint64, err error) {
+
 	f, err := d.dataFiles_.Open(int(position), "r")
 	if err != nil {
 		return pointers, nil, nil, err

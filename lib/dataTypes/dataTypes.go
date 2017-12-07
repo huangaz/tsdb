@@ -15,7 +15,7 @@ type TimeSeriesBlock struct {
 }
 
 const (
-	DATA_BLOCK_SIZE = 65535
+	DATA_BLOCK_SIZE = 65536
 	PAGE_SIZE       = DATA_BLOCK_SIZE
 	DATA_PRE_FIX    = "block_data"
 	COMPLETE_PREFIX = "complete_block"
