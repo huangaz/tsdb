@@ -1,3 +1,4 @@
+// This class hold a rolling window of TimeSeries data.
 package bucketedTimeSeries
 
 import (
@@ -47,8 +48,12 @@ func (b *BucketedTimeSeries) Reset(n uint8) {
 	b.stream_.ExtraData = DEFAULT_CATEGORY
 }
 
-// Open the next bucket for writes
-func (b *BucketedTimeSeries) open(next, timeSeriesId uint32, storage *bucketStorage.BucketStorage) (err error) {
+// Open the next bucket for writes, copy out the current active data.
+// `next`: the number of next bucket
+// `storage`: store current active data
+func (b *BucketedTimeSeries) open(next, timeSeriesId uint32,
+	storage *bucketStorage.BucketStorage) (err error) {
+
 	if b.current_ == 0 {
 		// Skip directly to the new value.
 		b.current_ = next
@@ -60,7 +65,8 @@ func (b *BucketedTimeSeries) open(next, timeSeriesId uint32, storage *bucketStor
 	for b.current_ != next {
 		if b.count_ > 0 {
 			// Copy out the active data.
-			block, err = storage.Store(b.current_, b.stream_.Bs.Stream, b.count_, timeSeriesId)
+			block, err = storage.Store(b.current_, b.stream_.Bs.Stream, b.count_,
+				timeSeriesId)
 			if err != nil {
 				return err
 			}
@@ -83,12 +89,16 @@ func (b *BucketedTimeSeries) open(next, timeSeriesId uint32, storage *bucketStor
 
 // Add a data point to the given bucket.
 // If category pointer is defined, sets the category.
-func (b *BucketedTimeSeries) Put(i, timeSeriesId uint32, dp *dataTypes.DataPoint, storage *bucketStorage.BucketStorage, category *uint16) (err error) {
+// `i`: the number of bucket to store data
+// `dp`: data point to be stored
+func (b *BucketedTimeSeries) Put(i, timeSeriesId uint32, dp *dataTypes.DataPoint,
+	storage *bucketStorage.BucketStorage, category *uint16) (err error) {
+
 	if i < b.current_ {
 		return errors.New("Invalid bucket number!")
 	}
 
-	if i != b.current_ {
+	if i > b.current_ {
 		err = b.open(i, timeSeriesId, storage)
 		if err != nil {
 			return err
@@ -109,7 +119,9 @@ func (b *BucketedTimeSeries) Put(i, timeSeriesId uint32, dp *dataTypes.DataPoint
 }
 
 // Read out buckets between begin and end inclusive, including current one.
-func (b *BucketedTimeSeries) Get(begin, end uint32, storage *bucketStorage.BucketStorage) (out []dataTypes.TimeSeriesBlock, err error) {
+func (b *BucketedTimeSeries) Get(begin, end uint32,
+	storage *bucketStorage.BucketStorage) (out []dataTypes.TimeSeriesBlock, err error) {
+
 	n := storage.NumBuckets()
 
 	getCurrent := begin <= b.current_ && end >= b.current_
@@ -126,16 +138,22 @@ func (b *BucketedTimeSeries) Get(begin, end uint32, storage *bucketStorage.Bucke
 		begin = utils.MaxUint32(begin, 0)
 	}
 
+	// Read data.
+	var outBlock dataTypes.TimeSeriesBlock
 	for i := begin; i <= end; i++ {
-		var outBlock dataTypes.TimeSeriesBlock
 		outBlock.Data, outBlock.Count, err = storage.Fetch(i, b.blocks_[i%uint32(n)])
+		/*
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, outBlock)
+		*/
 		if err == nil {
 			out = append(out, outBlock)
 		}
 	}
 
 	if getCurrent == true {
-		var outBlock dataTypes.TimeSeriesBlock
 		outBlock.Count = b.count_
 		outBlock.Data = b.stream_.ReadData()
 		out = append(out, outBlock)
@@ -146,7 +164,9 @@ func (b *BucketedTimeSeries) Get(begin, end uint32, storage *bucketStorage.Bucke
 
 // Sets the current bucket. Flushes data from the previous bucket to
 // BucketStorage. No-op if this time series is already at currentBucket.
-func (b *BucketedTimeSeries) SetCurretBucket(currentBucket, timeSeriesId uint32, storage *bucketStorage.BucketStorage) (err error) {
+func (b *BucketedTimeSeries) SetCurretBucket(currentBucket, timeSeriesId uint32,
+	storage *bucketStorage.BucketStorage) (err error) {
+
 	if b.current_ < currentBucket {
 		err = b.open(currentBucket, timeSeriesId, storage)
 		if err != nil {
@@ -185,6 +205,18 @@ func (b *BucketedTimeSeries) HasDataPoints(numBuckets uint8) bool {
 	return false
 }
 
-/*
-func (b *BucketedTimeSeries) getLastUpdateTime()
-*/
+// Returns how many buckets ago this value was queried.
+// Will return 255 if it has never been queried.
+func (b *BucketedTimeSeries) GetQueriedBucketsAgo() uint8 {
+	return b.queriedBucketsAgo_
+}
+
+// Returns the ODS category associated with this time series.
+func (b *BucketedTimeSeries) GetCategory() uint16 {
+	return b.stream_.ExtraData
+}
+
+// Sets the ODS category for this time series.
+func (b *BucketedTimeSeries) SetCategory(category uint16) {
+	b.stream_.ExtraData = category
+}

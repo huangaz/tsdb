@@ -43,52 +43,76 @@ func TestCreateId_ParseId(t *testing.T) {
 }
 
 func TestStoreAndFetch(t *testing.T) {
-	b := NewBueketStorage(1, 1, &testUtil.DataDirectory_Test)
-	testString := "test"
-	testData := []byte(testString)
+	b := NewBueketStorage(5, 1, &testUtil.DataDirectory_Test)
+	testString1 := "test"
+	testData1 := []byte(testString1)
+	testString2 := "text"
+	testData2 := []byte(testString2)
 
 	// normal store and fetch
-	id, err := b.Store(11, testData, 100, 0)
+	id1, err := b.Store(10, testData1, 100, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if id == INVALID_ID {
+	if id1 == INVALID_ID {
 		t.Fatal("Invalid id!")
 	}
 
-	resData, count, err := b.Fetch(11, id)
+	id2, err := b.Store(11, testData2, 200, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if count != 100 {
-		t.Fatal("wrong count!")
+	if id2 == INVALID_ID {
+		t.Fatal("Invalid id!")
 	}
-	if testUtil.IsEqualByteSlice(testData, resData) != true {
+
+	resData1, count1, err := b.Fetch(10, id1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count1 != 100 {
+		t.Fatal("Wrong count!")
+	}
+	if testUtil.IsEqualByteSlice(testData1, resData1) != true {
 		t.Fatal("Different between store and fetch!")
 	}
 
-	// Dedup data
-	id1, err := b.Store(11, testData, 100, 0)
+	resData2, count2, err := b.Fetch(11, id2)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if id == INVALID_ID {
-		t.Fatal("Invalid id!")
+	if count2 != 200 {
+		t.Fatal("Wrong count!")
 	}
-	if id != id1 {
-		t.Fatal("Different id between dedup data!")
+	if testUtil.IsEqualByteSlice(testData2, resData2) != true {
+		t.Fatal("Different between store and fetch!")
 	}
 
-	id2, err := b.Store(11, testData, 101, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if id == INVALID_ID {
-		t.Fatal("Invalid id!")
-	}
-	if id == id2 {
-		t.Error("Same id between different data!")
-	}
+	/*
+
+		// Dedup data
+		id1, err := b.Store(11, testData, 100, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if id == INVALID_ID {
+			t.Fatal("Invalid id!")
+		}
+		if id != id1 {
+			t.Fatal("Different id between dedup data!")
+		}
+
+		id2, err := b.Store(11, testData, 101, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if id == INVALID_ID {
+			t.Fatal("Invalid id!")
+		}
+		if id == id2 {
+			t.Error("Same id between different data!")
+		}
+	*/
 }
 
 func TestTooMuchData(t *testing.T) {
@@ -153,7 +177,7 @@ func TestFinalizedAndLoad(t *testing.T) {
 	b := NewBueketStorage(1, 1, &testUtil.DataDirectory_Test)
 	testString := "test"
 	testData := []byte(testString)
-	testUtil.FileCreate(1)
+	testUtil.FileCreate(10)
 	defer testUtil.FileDelete()
 
 	_, err := b.Store(1, testData, 100, 35)
@@ -201,4 +225,5 @@ func TestDeleteBucketOlderThan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	testUtil.FileDelete()
 }
