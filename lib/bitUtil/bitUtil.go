@@ -22,6 +22,17 @@ func (b BitStream) String() string {
 }
 */
 
+func NewBitStream(s []byte) *BitStream {
+	res := new(BitStream)
+	if s != nil {
+		res.NumBits = uint64(8 * len(s))
+		res.Stream = make([]byte, len(s))
+		copy(res.Stream, s)
+	}
+	res.BitPos = 0
+	return res
+}
+
 // Add a value to a bit stream. `bitsInValue` specifies the number
 // of least significant bits that will be added to the bit
 // stream. The bits from `value` will be added from the most

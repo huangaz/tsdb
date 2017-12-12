@@ -1,3 +1,4 @@
+// This class appends data points to a log file.
 package dataLog
 
 import (
@@ -23,30 +24,36 @@ const (
 
 	// 3 bytes with with three unused bits. One of the is used for the control bit.
 	SHORT_ID_BITS = 21
-
 	// 4 bytes with with three unused bits. One of the is used for the control bit.
-	LONG_ID_BITS         = 29
+	LONG_ID_BITS = 29
+
+	// Control bit of id.
 	SHORT_ID_CONTROL_BIT = 0
 	LONG_ID_CONTROL_BIT  = 1
 
 	// 7 + 2 control bits -> 7 bits left in the byte.
 	SHORT_DELTA_BITS = 7
-	SHORT_DELTA_MIN  = -(1 << (SHORT_DELTA_BITS - 1)) + 1
-	SHORT_DELTA_MAX  = (1 << (SHORT_DELTA_BITS - 1))
+	// -63
+	SHORT_DELTA_MIN = -(1 << (SHORT_DELTA_BITS - 1)) + 1
+	// 64
+	SHORT_DELTA_MAX = (1 << (SHORT_DELTA_BITS - 1))
 
 	// 14 + 3 control bits -> 7 bits left in the byte.
 	MEDIUM_DELTA_BITS = 14
-	MEDIUM_DELTA_MIN  = -(1 << (MEDIUM_DELTA_BITS - 1)) + 1
-	MEDIUM_DELTA_MAX  = (1 << (MEDIUM_DELTA_BITS - 1))
+	// -8191
+	MEDIUM_DELTA_MIN = -(1 << (MEDIUM_DELTA_BITS - 1)) + 1
+	// 8192
+	MEDIUM_DELTA_MAX = (1 << (MEDIUM_DELTA_BITS - 1))
 
 	LARGE_DELTA_BITS = 32
-	LARGE_DELTA_MIN  = math.MinInt32
+	LARGE_DELTA_MIN  = -(1 << (LARGE_DELTA_BITS - 1)) + 1
+	// LARGE_DELTA_MIN  = math.MinInt32
 
 	// Control bits for the timestamp type
-	ZERO_DELTA_CONTROL_VALUE   = 0
-	SHORT_DELTA_CONTROL_VALUE  = 2
-	MEDIUM_DELTA_CONTROL_VALUE = 6
-	LARGE_DELTA_CONTROL_VALUE  = 7
+	ZERO_DELTA_CONTROL_VALUE   = 0 // 0
+	SHORT_DELTA_CONTROL_VALUE  = 2 // 10
+	MEDIUM_DELTA_CONTROL_VALUE = 6 // 110
+	LARGE_DELTA_CONTROL_VALUE  = 7 // 111
 
 	PREVIOUS_VALUE_VECTOR_SIZE_INCREMENT = 1000
 
@@ -89,16 +96,17 @@ func (d *DataLogWriter) DeleteDataLogWriter() {
 	}
 }
 
-// Flushes the buffer that has been created with `append` calls to
-// disk. Returns true if writing was successful, false otherwise.
+// Flushes the buffer that has been created with `append` calls to disk.
 func (d *DataLogWriter) FlushBuffer() error {
 	if d.bufferSize_ > 0 {
-		written, err := d.out_.File.Write(d.buffer_)
+		tmpbuffer := d.buffer_[:d.bufferSize_]
+		written, err := d.out_.File.Write(tmpbuffer)
 		if err != nil {
 			return err
 		}
 		if uint64(written) != d.bufferSize_ {
-			errString := fmt.Sprintf("Flushing buffer failed! Wrote %d of %d to %s", written, d.bufferSize_, d.out_.Name)
+			errString := fmt.Sprintf("Flushing buffer failed! Wrote %d of %d to %s",
+				written, d.bufferSize_, d.out_.Name)
 			return errors.New(errString)
 		}
 		d.bufferSize_ = 0
@@ -110,8 +118,8 @@ func (d *DataLogWriter) FlushBuffer() error {
 // not thread safe. Caller is responsible for locking. Data will be
 // written to disk when buffer is full or `flushBuffer` is called or
 // destructor is called.
-func (d *DataLogWriter) Append(id uint32, unixTime uint64, value float64) error {
-	var b bitUtil.BitStream
+func (d *DataLogWriter) Append(id, unixTime uint64, value float64) error {
+	b := bitUtil.NewBitStream(nil)
 
 	if id > MAX_ALLOWED_TIMESERIES_ID {
 		return errors.New("ID too large. Increase MAX_ALLOWED_TIMESERIES_ID?")
@@ -121,10 +129,10 @@ func (d *DataLogWriter) Append(id uint32, unixTime uint64, value float64) error 
 	// allow the best case scenario of time delta = 0 and value/xor = 0.
 	if id >= (1 << SHORT_ID_BITS) {
 		b.AddValueToBitStream(LONG_ID_CONTROL_BIT, 1)
-		b.AddValueToBitStream(uint64(id), LONG_ID_BITS)
+		b.AddValueToBitStream(id, LONG_ID_BITS)
 	} else {
 		b.AddValueToBitStream(SHORT_ID_CONTROL_BIT, 1)
-		b.AddValueToBitStream(uint64(id), SHORT_ID_BITS)
+		b.AddValueToBitStream(id, SHORT_ID_BITS)
 	}
 
 	// Optimize for zero delta case and increase used bits 8 at a time
@@ -154,10 +162,11 @@ func (d *DataLogWriter) Append(id uint32, unixTime uint64, value float64) error 
 		b.AddValueToBitStream(uint64(delta), LARGE_DELTA_BITS)
 	}
 
-	if id >= uint32(len(d.previousvalues_)) {
+	if id >= uint64(len(d.previousvalues_)) {
 		// If the value hasn't been seen before, assume that the previous
 		// value is zero.
-		tmpSlice := make([]float64, id+PREVIOUS_VALUE_VECTOR_SIZE_INCREMENT-uint32(len(d.previousvalues_)))
+		tmpSlice := make([]float64, id+PREVIOUS_VALUE_VECTOR_SIZE_INCREMENT-
+			uint64(len(d.previousvalues_)))
 		d.previousvalues_ = append(d.previousvalues_, tmpSlice...)
 	}
 
@@ -165,12 +174,11 @@ func (d *DataLogWriter) Append(id uint32, unixTime uint64, value float64) error 
 	previousValue := math.Float64bits(d.previousvalues_[id])
 	xorWithPrevious := v ^ previousValue
 	if xorWithPrevious == 0 {
+		// Same as previous value, just store a single bit.
 		b.AddValueToBitStream(SAME_VALUE_CONTROL_BIT, 1)
 	} else {
 		b.AddValueToBitStream(DIFFERENT_VALUE_CONTROL_BIT, 1)
 
-		// Check TimeSeriesStream.cpp for more information about this
-		// algorithm.
 		leadingZeros := bitUtil.Clz(xorWithPrevious)
 		trailingZeros := bitUtil.Ctz(xorWithPrevious)
 		if leadingZeros > 31 {
@@ -188,13 +196,16 @@ func (d *DataLogWriter) Append(id uint32, unixTime uint64, value float64) error 
 	d.previousvalues_[id] = value
 	d.lastTimestamp_ = unixTime
 
-	if b.NumBits+d.bufferSize_ > DATA_LOG_BUFFER_SIZE {
+	size := uint64(len(b.Stream))
+
+	if size+d.bufferSize_ > DATA_LOG_BUFFER_SIZE {
 		d.FlushBuffer()
 	}
 
-	dest := d.buffer_[d.bufferSize_-1 : d.bufferSize_+uint64(len(b.Stream))-1]
+	// Write stream into buffer.
+	dest := d.buffer_[d.bufferSize_ : d.bufferSize_+size]
 	binary.Read(bytes.NewReader(b.Stream), binary.BigEndian, dest)
-	d.bufferSize_ += uint64(len(b.Stream))
+	d.bufferSize_ += size
 
 	return nil
 }
@@ -202,19 +213,21 @@ func (d *DataLogWriter) Append(id uint32, unixTime uint64, value float64) error 
 // Pull all the data points from the file.
 // Returns the number of points read, or -1 if the file could not be read.
 // The callback should return false if reading should be stopped.
-func (d *DataLogReader) ReadLog(file *fileUtils.File, baseTime uint64, f func(uint64, uint64, float64) (out bool)) (points int, err error) {
-	var b bitUtil.BitStream
-	b.Stream, err = ioutil.ReadAll(file.File)
+func (d *DataLogReader) ReadLog(file *fileUtils.File, baseTime uint64,
+	f func(uint64, uint64, float64) (out bool)) (points int, err error) {
+
+	stream, err := ioutil.ReadAll(file.File)
 	if err != nil {
 		return -1, err
 	}
+	b := bitUtil.NewBitStream(stream)
 	length := len(b.Stream)
 	if length == 0 {
 		return 0, nil
 	}
 
 	// Read out all the available points.
-	preTime := baseTime
+	prevTime := baseTime
 	var previousValues []float64
 
 	// Need at least three bytes for a complete value.
@@ -234,7 +247,6 @@ func (d *DataLogReader) ReadLog(file *fileUtils.File, baseTime uint64, f func(ui
 			id, err = b.ReadValueFromBitStream(LONG_ID_BITS)
 			if err != nil {
 				return points, err
-
 			}
 		}
 
@@ -246,10 +258,9 @@ func (d *DataLogReader) ReadLog(file *fileUtils.File, baseTime uint64, f func(ui
 
 		// Read the time stamp delta based on the the number of bits in
 		// the delta.
-		timeDeltaControlValue, err := b.ReadValueFromBitStream(3)
+		timeDeltaControlValue, err := b.ReadValueThroughFirstZero(3)
 		if err != nil {
 			return points, err
-
 		}
 
 		var timeDalte int64
@@ -261,33 +272,32 @@ func (d *DataLogReader) ReadLog(file *fileUtils.File, baseTime uint64, f func(ui
 			tmp, err = b.ReadValueFromBitStream(SHORT_DELTA_BITS)
 			if err != nil {
 				return points, err
-
 			}
 			timeDalte = int64(tmp) + SHORT_DELTA_MIN
 		case MEDIUM_DELTA_CONTROL_VALUE:
 			tmp, err = b.ReadValueFromBitStream(MEDIUM_DELTA_BITS)
 			if err != nil {
 				return points, err
-
 			}
 			timeDalte = int64(tmp) + MEDIUM_DELTA_MIN
 		case LARGE_DELTA_CONTROL_VALUE:
 			tmp, err = b.ReadValueFromBitStream(LARGE_DELTA_BITS)
 			if err != nil {
 				return points, err
-
 			}
 			timeDalte = int64(tmp) + LARGE_DELTA_MIN
 		default:
-			err = errors.New(fmt.Sprintf("Invalid time delta control value %d", timeDeltaControlValue))
+			err = errors.New(fmt.Sprintf("Invalid time delta control value %d",
+				timeDeltaControlValue))
 			return points, err
 		}
 
-		unixTime := uint64(int64(preTime) + timeDalte)
-		preTime = unixTime
+		unixTime := uint64(int64(prevTime) + timeDalte)
+		prevTime = unixTime
 
 		if id >= uint64(len(previousValues)) {
-			tmpSlice := make([]float64, id+PREVIOUS_VALUE_VECTOR_SIZE_INCREMENT-uint64(len(previousValues)))
+			tmpSlice := make([]float64, id+PREVIOUS_VALUE_VECTOR_SIZE_INCREMENT-
+				uint64(len(previousValues)))
 			previousValues = append(previousValues, tmpSlice...)
 		}
 

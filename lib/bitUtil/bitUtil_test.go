@@ -6,7 +6,7 @@ import (
 
 func TestAddAndRead(t *testing.T) {
 	// Normal add and read value
-	var b BitStream
+	b := NewBitStream(nil)
 	for i := uint64(1); i < 20; i++ {
 		b.AddValueToBitStream(i, i)
 	}
@@ -28,7 +28,7 @@ func TestAddAndRead(t *testing.T) {
 }
 
 func TestFindTheFirstZeroBit(t *testing.T) {
-	var b BitStream
+	b := NewBitStream(nil)
 	b.AddValueToBitStream(240, 8) // 11110000
 	res, err := b.FindTheFirstZeroBit(2)
 	if err != nil {
@@ -50,7 +50,7 @@ func TestFindTheFirstZeroBit(t *testing.T) {
 }
 
 func TestReadValueThroughFirstZero(t *testing.T) {
-	var b BitStream
+	b := NewBitStream(nil)
 	b.AddValueToBitStream(240, 8)
 	res, err := b.ReadValueThroughFirstZero(b.NumBits)
 	if err != nil {
