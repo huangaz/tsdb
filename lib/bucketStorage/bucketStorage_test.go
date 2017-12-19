@@ -88,31 +88,18 @@ func TestStoreAndFetch(t *testing.T) {
 		t.Fatal("Different between store and fetch!")
 	}
 
-	/*
+	// Dedup data
+	id3, err := b.Store(10, testData1, 100, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id3 == INVALID_ID {
+		t.Fatal("Invalid id!")
+	}
+	if id3 != id1 {
+		t.Fatal("Different id between dedup data!")
+	}
 
-		// Dedup data
-		id1, err := b.Store(11, testData, 100, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if id == INVALID_ID {
-			t.Fatal("Invalid id!")
-		}
-		if id != id1 {
-			t.Fatal("Different id between dedup data!")
-		}
-
-		id2, err := b.Store(11, testData, 101, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if id == INVALID_ID {
-			t.Fatal("Invalid id!")
-		}
-		if id == id2 {
-			t.Error("Same id between different data!")
-		}
-	*/
 }
 
 func TestTooMuchData(t *testing.T) {

@@ -364,6 +364,8 @@ func (b *BucketStorage) clearAndDisable() {
 		ptr[i].pages = ptr[i].pages[:0]
 		ptr[i].activePages = 0
 		ptr[i].lastPageBytesUsed = 0
+		ptr[i].storageIdsLookupMap = make(map[uint64]([]uint64))
+		ptr[i].finalized = false
 	}
 }
 
