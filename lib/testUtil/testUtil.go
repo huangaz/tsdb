@@ -10,6 +10,7 @@ import (
 var (
 	DataPrefix          = dataTypes.DATA_PRE_FIX
 	CompletePrefix      = dataTypes.COMPLETE_PREFIX
+	LogPrefix           = dataTypes.LOG_FILE_PREFIX
 	DataDirectory_Test  = "/tmp/path_test"
 	ShardDirectory_Test = DataDirectory_Test + "/1"
 )
@@ -54,6 +55,25 @@ func FileCreate(numOfFile int) {
 		os.Create(dataFile_Test)
 		os.Create(completeFile_Test)
 	}
+}
+
+func SingleFileCreate(path string, unixTime int64) {
+	dataFile := path + "/" + DataPrefix + "." + strconv.Itoa(int(unixTime))
+	completeFile := path + "/" + CompletePrefix + "." + strconv.Itoa(int(unixTime))
+	logFile := path + "/" + LogPrefix + "." + strconv.Itoa(int(unixTime))
+	os.Create(dataFile)
+	os.Create(completeFile)
+	os.Create(logFile)
+}
+
+func PathCreate(shardId int64) string {
+	ShardDirectory := DataDirectory_Test + "/" + strconv.Itoa(int(shardId))
+	err := os.MkdirAll(ShardDirectory, 0777)
+	if err != nil {
+		fmt.Println(err)
+		return ""
+	}
+	return ShardDirectory
 }
 
 func FileDelete() {

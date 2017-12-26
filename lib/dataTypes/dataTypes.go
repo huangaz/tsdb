@@ -1,5 +1,13 @@
 package dataTypes
 
+/*
+unixTime 	: int64
+shardId 	: int64
+
+bucketNumber 	: uint32
+windowSize 	: uint64
+*/
+
 type DataPoint struct {
 	Value     float64
 	Timestamp uint64
@@ -19,4 +27,5 @@ const (
 	PAGE_SIZE       = DATA_BLOCK_SIZE
 	DATA_PRE_FIX    = "block_data"
 	COMPLETE_PREFIX = "complete_block"
+	LOG_FILE_PREFIX = "log"
 )

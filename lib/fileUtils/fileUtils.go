@@ -58,6 +58,8 @@ func (f *FileUtils) Mode_Atoi(mode string) (flag int, err error) {
 		flag = os.O_RDONLY
 	case "a":
 		flag = os.O_APPEND
+	case "wc":
+		flag = os.O_WRONLY | os.O_CREATE
 	default:
 		err = errors.New("invalid mode!")
 	}

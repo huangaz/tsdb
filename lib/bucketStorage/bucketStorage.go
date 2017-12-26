@@ -424,7 +424,7 @@ func (b *BucketStorage) write(position, activePages uint32, pages []*dataTypes.D
 	b.dataFiles_.Remove(int(position - uint32(b.numbuckets_)))
 	b.completeFiles_.Remove(int(position - uint32(b.numbuckets_)))
 
-	dataFile, err := b.dataFiles_.Open(int(position), "w")
+	dataFile, err := b.dataFiles_.Open(int(position), "wc")
 	if err != nil {
 		return err
 	}
@@ -476,7 +476,7 @@ func (b *BucketStorage) write(position, activePages uint32, pages []*dataTypes.D
 		return err
 	}
 
-	completeFile, err := b.completeFiles_.Open(int(position), "w")
+	completeFile, err := b.completeFiles_.Open(int(position), "wc")
 	if err != nil {
 		return err
 	}

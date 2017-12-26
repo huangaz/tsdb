@@ -164,7 +164,7 @@ func TestFinalizedAndLoad(t *testing.T) {
 	b := NewBueketStorage(1, 1, &testUtil.DataDirectory_Test)
 	testString := "test"
 	testData := []byte(testString)
-	testUtil.FileCreate(10)
+	testUtil.PathCreate(1)
 	defer testUtil.FileDelete()
 
 	_, err := b.Store(1, testData, 100, 35)
