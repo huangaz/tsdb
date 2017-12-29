@@ -23,11 +23,11 @@ type File struct {
 }
 
 // Return a new FileUtils with the given shardId, prefix and dataDirectory
-func NewFileUtils(shardId int, prefix, dataDirectory *string) *FileUtils {
+func NewFileUtils(shardId int64, prefix, dataDirectory string) *FileUtils {
 	res := new(FileUtils)
-	res.directory_ = *dataDirectory
-	res.prefix_ = *prefix
-	res.directory_ = res.directory_ + "/" + strconv.Itoa(shardId)
+	res.directory_ = dataDirectory
+	res.prefix_ = prefix
+	res.directory_ = res.directory_ + "/" + strconv.Itoa(int(shardId))
 	return res
 }
 
@@ -60,6 +60,10 @@ func (f *FileUtils) Mode_Atoi(mode string) (flag int, err error) {
 		flag = os.O_APPEND
 	case "wc":
 		flag = os.O_WRONLY | os.O_CREATE
+	case "rc":
+		flag = os.O_RDONLY | os.O_CREATE
+	case "ac":
+		flag = os.O_APPEND | os.O_CREATE
 	default:
 		err = errors.New("invalid mode!")
 	}

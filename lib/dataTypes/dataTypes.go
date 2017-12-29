@@ -28,4 +28,5 @@ const (
 	DATA_PRE_FIX    = "block_data"
 	COMPLETE_PREFIX = "complete_block"
 	LOG_FILE_PREFIX = "log"
+	KEY_FILE_PREFIX = "key_list"
 )
