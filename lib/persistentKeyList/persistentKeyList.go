@@ -29,9 +29,9 @@ type PersistentKeyList struct {
 }
 
 type KeyItem struct {
-	id       int
-	key      string
-	category uint16
+	Id       int32
+	Key      string
+	Category uint16
 }
 
 const (
@@ -151,8 +151,7 @@ func (p *PersistentKeyList) flush(hardFlush bool) error {
 
 // Call f on each key in the list.
 // The callback should return false if reading should be stopped.
-func (p *PersistentKeyList) readKeys(shardId int64, dataDirectory string,
-	f func(KeyItem) bool) (int, error) {
+func ReadKeys(shardId int64, dataDirectory string, f func(KeyItem) bool) (int, error) {
 
 	files := fileUtils.NewFileUtils(shardId, KeyFilePrefix, dataDirectory)
 
@@ -189,7 +188,7 @@ func (p *PersistentKeyList) readKeys(shardId int64, dataDirectory string,
 		var keysFound int = 0
 
 		if buffer[0] == FILE_MARKER || buffer[0] == FILE_WITH_CATEGORIES_MARKER {
-			keysFound = p.readKeysFromBuffer(buffer[1:], length-1,
+			keysFound = readKeysFromBuffer(buffer[1:], length-1,
 				buffer[0] == FILE_WITH_CATEGORIES_MARKER, f)
 		}
 
@@ -202,7 +201,7 @@ func (p *PersistentKeyList) readKeys(shardId int64, dataDirectory string,
 	return keys, nil
 }
 
-func (p *PersistentKeyList) readKeysFromBuffer(buffer []byte, len int, categoryPresent bool,
+func readKeysFromBuffer(buffer []byte, len int, categoryPresent bool,
 	f func(KeyItem) bool) int {
 
 	var keys int = 0
@@ -218,15 +217,15 @@ func (p *PersistentKeyList) readKeysFromBuffer(buffer []byte, len int, categoryP
 	endIndex := len - minRecordLength
 	var defaultCategory uint16 = 0
 	for index := 0; index <= endIndex; {
-		item := KeyItem{category: defaultCategory}
+		item := KeyItem{Category: defaultCategory}
 
 		// read "id" from buffer
-		item.id = int(binary.BigEndian.Uint32(buffer[index : index+4]))
+		item.Id = int32(binary.BigEndian.Uint32(buffer[index : index+4]))
 		index += 4
 
 		// read "category" from buffer
 		if categoryPresent {
-			item.category = binary.BigEndian.Uint16(buffer[index : index+2])
+			item.Category = binary.BigEndian.Uint16(buffer[index : index+2])
 			index += 2
 		}
 
@@ -241,7 +240,7 @@ func (p *PersistentKeyList) readKeysFromBuffer(buffer []byte, len int, categoryP
 		if err != nil {
 			break
 		}
-		item.key = string(keySlice)
+		item.Key = string(keySlice)
 		index += keyLength
 
 		if !f(item) {
@@ -253,9 +252,9 @@ func (p *PersistentKeyList) readKeysFromBuffer(buffer []byte, len int, categoryP
 	return keys
 }
 
-// Must not be called until after a call to readKeys().
+// Must not be called until after a call to ReadKeys().
 // Returns false on failure.
-func (p *PersistentKeyList) appendKey(item KeyItem) bool {
+func (p *PersistentKeyList) AppendKey(item KeyItem) bool {
 	p.lock_.Lock()
 	defer p.lock_.Unlock()
 
@@ -276,9 +275,14 @@ func (p *PersistentKeyList) writeKey(item KeyItem) {
 		p.nextHardFlushTimeSecs_ = time.Now().Unix() + HARD_FLUSH_INTERVAL_SECS
 	}
 
-	if len(p.buffer_) >= SMALL_BUFFER_SIZE || flushHard {
-		p.flush(flushHard)
-	}
+	// only for test
+	p.flush(true)
+
+	/*
+		if len(p.buffer_) >= SMALL_BUFFER_SIZE || flushHard {
+			p.flush(flushHard)
+		}
+	*/
 }
 
 // Appends id, key, category to the given buffer. The buffer can be
@@ -286,18 +290,18 @@ func (p *PersistentKeyList) writeKey(item KeyItem) {
 // appending.
 func (p *PersistentKeyList) appendBuffer(buffer *[]byte, item KeyItem) {
 	// sizeof(id) + len(string) + sizeof(category) + sizeof(keyLength)
-	keyLength := len(item.key)
+	keyLength := len(item.Key)
 	dataLen := 4 + keyLength + 2 + 4
 	tmpBuffer := make([]byte, dataLen)
 	index := 0
 
 	tmpSlice := make([]byte, 4)
-	binary.BigEndian.PutUint32(tmpSlice, uint32(item.id))
+	binary.BigEndian.PutUint32(tmpSlice, uint32(item.Id))
 	binary.Read(bytes.NewReader(tmpSlice), binary.BigEndian, tmpBuffer[index:index+4])
 	index += 4
 
 	tmpSlice = make([]byte, 2)
-	binary.BigEndian.PutUint16(tmpSlice, item.category)
+	binary.BigEndian.PutUint16(tmpSlice, item.Category)
 	binary.Read(bytes.NewReader(tmpSlice), binary.BigEndian, tmpBuffer[index:index+2])
 	index += 2
 
@@ -306,12 +310,12 @@ func (p *PersistentKeyList) appendBuffer(buffer *[]byte, item KeyItem) {
 	binary.Read(bytes.NewReader(tmpSlice), binary.BigEndian, tmpBuffer[index:index+4])
 	index += 4
 
-	copy(tmpBuffer[index:], []byte(item.key))
+	copy(tmpBuffer[index:], []byte(item.Key))
 
 	*buffer = append(*buffer, tmpBuffer...)
 }
 
-func (p *PersistentKeyList) compact(generator func() []KeyItem) error {
+func (p *PersistentKeyList) Compact(generator func() KeyItem) error {
 	// Directly appends to a new file.
 	prev, err := p.openNext()
 	if err != nil {
@@ -324,10 +328,8 @@ func (p *PersistentKeyList) compact(generator func() []KeyItem) error {
 		return err
 	}
 
-	items := generator()
 	var buffer []byte
-	// buffer := make([]byte, len(items))
-	for _, item := range items {
+	for item := generator(); item.Key != ""; item = generator() {
 		p.appendBuffer(&buffer, item)
 	}
 

@@ -17,7 +17,7 @@ func TestWriteAndRead(t *testing.T) {
 	keys := NewPersistentKeyList(shardId, dataDirectory)
 
 	called := false
-	_, err := keys.readKeys(shardId, dataDirectory, func(KeyItem) bool {
+	_, err := ReadKeys(shardId, dataDirectory, func(KeyItem) bool {
 		called = true
 		return true
 	})
@@ -34,9 +34,9 @@ func TestWriteAndRead(t *testing.T) {
 	data2 := KeyItem{4, "test", 2}
 	data3 := KeyItem{7, "bye", 3}
 
-	keys.appendKey(data1)
-	keys.appendKey(data2)
-	keys.appendKey(data3)
+	keys.AppendKey(data1)
+	keys.AppendKey(data2)
+	keys.AppendKey(data3)
 	err = keys.flush(true)
 	if err != nil {
 		t.Fatal(err)
@@ -44,49 +44,51 @@ func TestWriteAndRead(t *testing.T) {
 
 	var datas []KeyItem
 
-	keys.readKeys(shardId, dataDirectory, func(item KeyItem) bool {
+	ReadKeys(shardId, dataDirectory, func(item KeyItem) bool {
 		datas = append(datas, item)
 		return true
 	})
 
-	if datas[0].id != 5 || datas[0].key != "hi" || datas[0].category != 1 {
+	if datas[0].Id != 5 || datas[0].Key != "hi" || datas[0].Category != 1 {
 		t.Fatal("Wrong data!")
 	}
 
-	if datas[1].id != 4 || datas[1].key != "test" || datas[1].category != 2 {
+	if datas[1].Id != 4 || datas[1].Key != "test" || datas[1].Category != 2 {
 		t.Fatal("Wrong data!")
 	}
 
-	if datas[2].id != 7 || datas[2].key != "bye" || datas[2].category != 3 {
+	if datas[2].Id != 7 || datas[2].Key != "bye" || datas[2].Category != 3 {
 		t.Fatal("Wrong data!")
 	}
 
 	// Rewrite two keys.
-	err = keys.compact(func() []KeyItem {
-		var items []KeyItem
-		for i := 0; i < 2; i++ {
+	i := 0
+	err = keys.Compact(func() KeyItem {
+		if i < 2 {
 			item := KeyItem{1, "test2", 15}
-			items = append(items, item)
+			i++
+			return item
 		}
-		return items
+		return KeyItem{0, "", 0}
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	keys.appendKey(KeyItem{8, "test3", 122})
+
+	keys.AppendKey(KeyItem{8, "test3", 122})
 	keys.flush(true)
 
 	datas = datas[:0]
-	keys.readKeys(shardId, dataDirectory, func(item KeyItem) bool {
+	ReadKeys(shardId, dataDirectory, func(item KeyItem) bool {
 		datas = append(datas, item)
 		return true
 	})
 
-	if datas[0].id != 1 || datas[0].key != "test2" || datas[0].category != 15 {
+	if datas[0].Id != 1 || datas[0].Key != "test2" || datas[0].Category != 15 {
 		t.Fatal("wrong data!")
 	}
 
-	if datas[2].id != 8 || datas[2].key != "test3" || datas[2].category != 122 {
+	if datas[2].Id != 8 || datas[2].Key != "test3" || datas[2].Category != 122 {
 		t.Fatal("wrong data!")
 	}
 
