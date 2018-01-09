@@ -10,15 +10,15 @@ import (
 var (
 	prefix        = testUtil.DataPrefix
 	dataDirectory = testUtil.DataDirectory_Test
-	ids           []uint64
-	times         []uint64
+	ids           []uint32
+	times         []int64
 	values        []float64
 )
 
 func TestAppendAndRead(t *testing.T) {
 	testUtil.FileDelete()
 	testUtil.FileCreate(1)
-	files := fileUtils.NewFileUtils(1, &prefix, &dataDirectory)
+	files := fileUtils.NewFileUtils(1, prefix, dataDirectory)
 	testFile, err := files.Open(1, "w")
 	if err != nil {
 		t.Fatal(err)
@@ -55,14 +55,13 @@ func TestAppendAndRead(t *testing.T) {
 	}
 	defer files.Close(testFile)
 
-	var read DataLogReader
-	_, err = read.ReadLog(&testFile, 0, f)
+	_, err = ReadLog(&testFile, 0, f)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	expectedIds := []uint64{0, 0, 3, 3000000}
-	expectedTimes := []uint64{101, 101, 104, 9000}
+	expectedIds := []uint32{0, 0, 3, 3000000}
+	expectedTimes := []int64{101, 101, 104, 9000}
 	expectedValues := []float64{2.0, 2.0, 5.0, 0.0}
 
 	if reflect.DeepEqual(expectedIds, ids) != true {
@@ -76,7 +75,7 @@ func TestAppendAndRead(t *testing.T) {
 	}
 }
 
-func f(id, time uint64, value float64) (out bool) {
+func f(id uint32, time int64, value float64) (out bool) {
 	ids = append(ids, id)
 	times = append(times, time)
 	values = append(values, value)

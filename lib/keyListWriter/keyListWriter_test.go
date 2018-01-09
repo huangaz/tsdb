@@ -1,4 +1,4 @@
-package KeyListWriter
+package keyListWriter
 
 import (
 	"github.com/huangaz/tsdb/lib/persistentKeyList"
@@ -17,10 +17,10 @@ func TestWriteAndRead(t *testing.T) {
 	defer testUtil.FileDelete()
 
 	keyWriter := NewKeyListWriter(dataDirectory, 10)
-	keyWriter.startShard(shardId)
-	keyWriter.addKey(shardId, 6, "hi", 43)
-	keyWriter.stopShard(shardId)
-	keyWriter.addKey(shardId, 7, "bye", 44)
+	keyWriter.StartShard(shardId)
+	keyWriter.AddKey(shardId, 6, "hi", 43)
+	keyWriter.StopShard(shardId)
+	keyWriter.AddKey(shardId, 7, "bye", 44)
 	keyWriter.flushQueue()
 
 	time.Sleep(100 * time.Millisecond)
@@ -50,12 +50,12 @@ func TestCompactAndRead(t *testing.T) {
 	defer testUtil.FileDelete()
 
 	keyWriter := NewKeyListWriter(dataDirectory, 10)
-	keyWriter.startShard(shardId)
+	keyWriter.StartShard(shardId)
 	keyWriter.flushQueue()
 	time.Sleep(100 * time.Millisecond)
 
 	item := persistentKeyList.KeyItem{7, "hello", 72}
-	err := keyWriter.compact(shardId, func() persistentKeyList.KeyItem {
+	err := keyWriter.Compact(shardId, func() persistentKeyList.KeyItem {
 		item2 := item
 		item.Key = ""
 		return item2

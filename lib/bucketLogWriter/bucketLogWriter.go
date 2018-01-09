@@ -150,7 +150,7 @@ func (b *BucketLogWriter) flushQueue() {
 }
 
 // This will push the given data entry to a queue for logging.
-func (b *BucketLogWriter) logData(shardId int64, index int32, unixTime int64,
+func (b *BucketLogWriter) LogData(shardId int64, index int32, unixTime int64,
 	value float64) {
 
 	var info LogDataInfo
@@ -189,8 +189,8 @@ func (b *BucketLogWriter) writeOneLogEntry() bool {
 			writer.nextClearTimeSecs = bucketUtils.FloorTimestamp(time.Now().Unix()+
 				int64(b.duration(2)), b.windowSize_, info.shardId)
 
-			writer.fileUtils = fileUtils.NewFileUtils(int(info.shardId), &LogFilePrefix,
-				&b.dataDirectory_)
+			writer.fileUtils = fileUtils.NewFileUtils(info.shardId, LogFilePrefix,
+				b.dataDirectory_)
 			b.shardWriters_[info.shardId] = writer
 
 		} else if info.index == STOP_SHARD_INDEX {
@@ -219,7 +219,7 @@ func (b *BucketLogWriter) writeOneLogEntry() bool {
 				for i := 0; i < FILE_OPEN_RETRY; i++ {
 					f, err := sw.fileUtils.Open(int(info.unixTime), "wc")
 					if err == nil && f.File != nil {
-						logWriter = dataLog.NewDataLogWriter(&f, uint64(info.unixTime))
+						logWriter = dataLog.NewDataLogWriter(&f, info.unixTime)
 						break
 					}
 					if i == FILE_OPEN_RETRY-1 {
@@ -244,7 +244,7 @@ func (b *BucketLogWriter) writeOneLogEntry() bool {
 					if err == nil && f.File != nil {
 						// Append the new logWriter.
 						sw.logWriters[bucketNum+1] = dataLog.NewDataLogWriter(&f,
-							uint64(baseTime))
+							baseTime)
 						break
 					}
 					if i == FILE_OPEN_RETRY-1 {
@@ -274,7 +274,7 @@ func (b *BucketLogWriter) writeOneLogEntry() bool {
 			}
 
 			if logWriter != nil {
-				logWriter.Append(uint64(info.index), uint64(info.unixTime), info.value)
+				logWriter.Append(uint32(info.index), info.unixTime, info.value)
 				// logWriter.DeleteDataLogWriter()
 				logWriter.FlushBuffer()
 			}
@@ -287,7 +287,7 @@ func (b *BucketLogWriter) writeOneLogEntry() bool {
 }
 
 // Starts writing points for this shard.
-func (b *BucketLogWriter) startShard(shardId int64) {
+func (b *BucketLogWriter) StartShard(shardId int64) {
 	var info LogDataInfo
 	info.shardId = shardId
 	info.index = START_SHARD_INDEX
@@ -295,9 +295,8 @@ func (b *BucketLogWriter) startShard(shardId int64) {
 }
 
 // Stops writing points for this shard and closes all the open files.
-func (b *BucketLogWriter) stopShard(shardId int64) {
+func (b *BucketLogWriter) StopShard(shardId int64) {
 	var info LogDataInfo
 	info.shardId = shardId
-	info.index = STOP_SHARD_INDEX
 	b.logDataQueue_ <- info
 }

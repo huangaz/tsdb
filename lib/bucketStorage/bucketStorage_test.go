@@ -13,15 +13,15 @@ func TestNewBucketData(t *testing.T) {
 }
 
 func TestNewBucketStorage(t *testing.T) {
-	res := NewBueketStorage(1, 1, &testUtil.DataDirectory_Test)
+	res := NewBueketStorage(1, 1, testUtil.DataDirectory_Test)
 	if res == nil {
 		t.Error("Initial BueketStorage failed!")
 	}
 }
 
 func TestEnable(t *testing.T) {
-	b := NewBueketStorage(1, 1, &testUtil.DataDirectory_Test)
-	b.enable()
+	b := NewBueketStorage(1, 1, testUtil.DataDirectory_Test)
+	b.Enable()
 	d := b.data_[0]
 
 	if d.disabled != false || d.activePages != 0 || d.lastPageBytesUsed != 0 {
@@ -30,7 +30,7 @@ func TestEnable(t *testing.T) {
 }
 
 func TestCreateId_ParseId(t *testing.T) {
-	b := NewBueketStorage(1, 1, &testUtil.DataDirectory_Test)
+	b := NewBueketStorage(1, 1, testUtil.DataDirectory_Test)
 	var pageIndex uint32 = 123
 	var pageOffset uint32 = 456
 	var dataLength uint16 = 789
@@ -43,7 +43,7 @@ func TestCreateId_ParseId(t *testing.T) {
 }
 
 func TestStoreAndFetch(t *testing.T) {
-	b := NewBueketStorage(5, 1, &testUtil.DataDirectory_Test)
+	b := NewBueketStorage(5, 1, testUtil.DataDirectory_Test)
 	testString1 := "test"
 	testData1 := []byte(testString1)
 	testString2 := "text"
@@ -103,7 +103,7 @@ func TestStoreAndFetch(t *testing.T) {
 }
 
 func TestTooMuchData(t *testing.T) {
-	b := NewBueketStorage(1, 1, &testUtil.DataDirectory_Test)
+	b := NewBueketStorage(1, 1, testUtil.DataDirectory_Test)
 
 	// count too large
 	testString := "test"
@@ -126,8 +126,8 @@ func TestTooMuchData(t *testing.T) {
 }
 
 func TestCleanAndDisable(t *testing.T) {
-	b := NewBueketStorage(1, 1, &testUtil.DataDirectory_Test)
-	b.clearAndDisable()
+	b := NewBueketStorage(1, 1, testUtil.DataDirectory_Test)
+	b.ClearAndDisable()
 	testString := "test"
 	testData := []byte(testString)
 	_, err := b.Store(11, testData, 100, 0)
@@ -137,7 +137,7 @@ func TestCleanAndDisable(t *testing.T) {
 }
 
 func TestStoreToExpiredBucket(t *testing.T) {
-	b := NewBueketStorage(5, 1, &testUtil.DataDirectory_Test)
+	b := NewBueketStorage(5, 1, testUtil.DataDirectory_Test)
 	testString := "test"
 	testData := []byte(testString)
 
@@ -161,7 +161,7 @@ func TestStoreToExpiredBucket(t *testing.T) {
 }
 
 func TestFinalizedAndLoad(t *testing.T) {
-	b := NewBueketStorage(1, 1, &testUtil.DataDirectory_Test)
+	b := NewBueketStorage(1, 1, testUtil.DataDirectory_Test)
 	testString := "test"
 	testData := []byte(testString)
 	testUtil.PathCreate(1)
@@ -172,7 +172,7 @@ func TestFinalizedAndLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = b.finalizeBucket(1)
+	err = b.FinalizeBucket(1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,9 +182,9 @@ func TestFinalizedAndLoad(t *testing.T) {
 		t.Fatal("Wrong err message when write data to a finalized bucket!")
 	}
 
-	b2 := NewBueketStorage(1, 1, &testUtil.DataDirectory_Test)
+	b2 := NewBueketStorage(1, 1, testUtil.DataDirectory_Test)
 
-	_, storageIds, err := b2.loadPosition(1)
+	_, storageIds, err := b2.LoadPosition(1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,11 +204,11 @@ func TestFinalizedAndLoad(t *testing.T) {
 }
 
 func TestDeleteBucketOlderThan(t *testing.T) {
-	b := NewBueketStorage(1, 1, &testUtil.DataDirectory_Test)
+	b := NewBueketStorage(1, 1, testUtil.DataDirectory_Test)
 	for i := 1; i < 10; i++ {
 		testUtil.FileCreate(i)
 	}
-	err := b.deleteBucketOlderThan(5)
+	err := b.DeleteBucketOlderThan(5)
 	if err != nil {
 		t.Fatal(err)
 	}

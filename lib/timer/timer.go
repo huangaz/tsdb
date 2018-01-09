@@ -35,7 +35,7 @@ func (t *Timer) Start() {
 }
 
 // Returns the total time elapsed.
-func (t *Timer) get() int64 {
+func (t *Timer) Get() int64 {
 	sum := t.sum_
 	if t.running() {
 		sum += t.getNow() - t.start_
@@ -44,7 +44,7 @@ func (t *Timer) get() int64 {
 }
 
 // Stops the timer. Returns the total time elapsed.
-func (t *Timer) stop() int64 {
+func (t *Timer) Stop() int64 {
 	if t.running() {
 		t.record()
 	}

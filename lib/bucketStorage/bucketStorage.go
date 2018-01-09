@@ -12,6 +12,7 @@ import (
 	"github.com/huangaz/tsdb/lib/dataBlockReader"
 	"github.com/huangaz/tsdb/lib/dataTypes"
 	"github.com/huangaz/tsdb/lib/fileUtils"
+	"sync"
 )
 
 const (
@@ -41,7 +42,7 @@ const (
 type BucketStorage struct {
 	numbuckets_      uint8
 	newestPosition_  uint32
-	data_            []BucketData
+	data_            []*BucketData
 	dataBlockReader_ *dataBlockReader.DataBlockReader
 	dataFiles_       *fileUtils.FileUtils
 	completeFiles_   *fileUtils.FileUtils
@@ -59,6 +60,10 @@ type BucketData struct {
 	timeSeriesIds       []uint32
 	storageIds          []uint64
 	storageIdsLookupMap map[uint64]([]uint64)
+
+	// To control that reads will always work, i.e., allocated pages
+	// won't be deleted.
+	fetchLock sync.RWMutex
 }
 
 // Return a new BucketData.
@@ -74,34 +79,37 @@ func NewBucketData() *BucketData {
 }
 
 // Return a new BucketStorage with the given bucket number, shardId and dataDirectory.
-func NewBueketStorage(numBuckets uint8, shardId int, dataDirectory *string) *BucketStorage {
+func NewBueketStorage(numBuckets uint8, shardId int64, dataDirectory string) *BucketStorage {
 	data_prefix := DATA_PREFIX
 	complete_prefix := COMPLETE_PREFIX
 	res := &BucketStorage{
 		numbuckets_:      numBuckets,
 		newestPosition_:  0,
 		dataBlockReader_: dataBlockReader.NewDataBlockReader(shardId, dataDirectory),
-		dataFiles_:       fileUtils.NewFileUtils(shardId, &data_prefix, dataDirectory),
-		completeFiles_:   fileUtils.NewFileUtils(shardId, &complete_prefix, dataDirectory),
+		dataFiles_:       fileUtils.NewFileUtils(shardId, data_prefix, dataDirectory),
+		completeFiles_:   fileUtils.NewFileUtils(shardId, complete_prefix, dataDirectory),
 	}
-	newdata := []BucketData{}
-	for i := uint8(0); i < numBuckets; i++ {
-		newBucketData := NewBucketData()
-		newdata = append(newdata, *newBucketData)
-	}
-	res.data_ = newdata
 
-	res.enable()
+	res.data_ = make([]*BucketData, numBuckets)
+	for i := 0; i < len(res.data_); i++ {
+		res.data_[i] = NewBucketData()
+	}
+
+	res.Enable()
 	return res
 }
 
 // Enables a previously disabled storage.
-func (b *BucketStorage) enable() {
+func (b *BucketStorage) Enable() {
 	ptr := b.data_[:]
 	for i := uint8(0); i < b.numbuckets_; i++ {
+		ptr[i].fetchLock.Lock()
+
 		ptr[i].disabled = false
 		ptr[i].activePages = 0
 		ptr[i].lastPageBytesUsed = 0
+
+		ptr[i].fetchLock.Unlock()
 	}
 }
 
@@ -131,6 +139,9 @@ func (b *BucketStorage) Store(position uint32, data []byte, itemCount uint16,
 	var pageIndex, pageOffset uint32
 	bucket := uint8(position % uint32(b.numbuckets_))
 	ptr := b.data_[:]
+
+	ptr[bucket].fetchLock.Lock()
+	defer ptr[bucket].fetchLock.Unlock()
 
 	// data is disabled
 	if ptr[bucket].disabled == true {
@@ -270,6 +281,9 @@ func (b *BucketStorage) Fetch(position uint32, id uint64) (data []byte, itemCoun
 		return nil, 0, err
 	}
 
+	ptr[bucket].fetchLock.RLock()
+	defer ptr[bucket].fetchLock.RUnlock()
+
 	if ptr[bucket].disabled == true {
 		err = errors.New("Data is disabled!")
 		return nil, 0, err
@@ -296,13 +310,16 @@ func (b *BucketStorage) Fetch(position uint32, id uint64) (data []byte, itemCoun
 
 // Read all blocks for a given position into memory from disk.
 // Return timeSeriesIds and storageIds with the metadata associated with the blocks.
-func (b *BucketStorage) loadPosition(position uint32) (timeSeriesIds []uint32,
+func (b *BucketStorage) LoadPosition(position uint32) (timeSeriesIds []uint32,
 	storageIds []uint64, err error) {
 
 	bucket := uint8(position % uint32(b.numbuckets_))
 	ptr := b.data_[:]
 
+	ptr[bucket].fetchLock.Lock()
+
 	if err = b.sanityCheck(bucket, position); err != nil {
+		ptr[bucket].fetchLock.Unlock()
 		return nil, nil, err
 	}
 
@@ -310,10 +327,12 @@ func (b *BucketStorage) loadPosition(position uint32) (timeSeriesIds []uint32,
 	// being actively filled by store().
 	if ptr[bucket].activePages != 0 {
 		err = errors.New("Bucket have been completely read or are being filled!")
+		ptr[bucket].fetchLock.Unlock()
 		return nil, nil, err
 	}
+	ptr[bucket].fetchLock.Unlock()
 
-	blocks, timeSeriesIds, storageIds, err := b.dataBlockReader_.ReadBlocks(uint(position))
+	blocks, timeSeriesIds, storageIds, err := b.dataBlockReader_.ReadBlocks(position)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -323,6 +342,9 @@ func (b *BucketStorage) loadPosition(position uint32) (timeSeriesIds []uint32,
 		err = errors.New("Block file read failures!")
 		return nil, nil, err
 	}
+
+	ptr[bucket].fetchLock.Lock()
+	defer ptr[bucket].fetchLock.Unlock()
 
 	ptr[bucket].pages = make([]*dataTypes.DataBlock, blocksSize)
 	ptr[bucket].activePages = uint32(blocksSize)
@@ -355,9 +377,11 @@ func (b *BucketStorage) sanityCheck(bucket uint8, position uint32) (err error) {
 }
 
 // Clear and disable the buckets for reads and writes.
-func (b *BucketStorage) clearAndDisable() {
+func (b *BucketStorage) ClearAndDisable() {
 	ptr := b.data_[:]
 	for i := uint8(0); i < b.numbuckets_; i++ {
+		ptr[i].fetchLock.Lock()
+
 		ptr[i].disabled = true
 
 		// c++ swap
@@ -366,6 +390,8 @@ func (b *BucketStorage) clearAndDisable() {
 		ptr[i].lastPageBytesUsed = 0
 		ptr[i].storageIdsLookupMap = make(map[uint64]([]uint64))
 		ptr[i].finalized = false
+
+		ptr[i].fetchLock.Unlock()
 	}
 }
 
@@ -376,9 +402,12 @@ func (b *BucketStorage) NumBuckets() uint8 {
 
 // Finalizes a bucket at the given position. After calling this no
 // more data can be stored in this bucket.
-func (b *BucketStorage) finalizeBucket(position uint32) (err error) {
+func (b *BucketStorage) FinalizeBucket(position uint32) (err error) {
 	bucket := uint8(position % uint32(b.numbuckets_))
 	ptr := b.data_[:]
+
+	ptr[bucket].fetchLock.Lock()
+	defer ptr[bucket].fetchLock.Unlock()
 
 	if ptr[bucket].disabled == true {
 		return errors.New("Trying to finalize a disabled bucket")
@@ -486,7 +515,7 @@ func (b *BucketStorage) write(position, activePages uint32, pages []*dataTypes.D
 }
 
 // Delete buckets older than the given position.
-func (b *BucketStorage) deleteBucketOlderThan(position uint32) (err error) {
+func (b *BucketStorage) DeleteBucketOlderThan(position uint32) (err error) {
 	err = b.completeFiles_.ClearTo(int(position))
 	if err != nil {
 		return err

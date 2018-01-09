@@ -10,7 +10,7 @@ windowSize 	: uint64
 
 type DataPoint struct {
 	Value     float64
-	Timestamp uint64
+	Timestamp int64
 }
 
 type DataBlock struct {

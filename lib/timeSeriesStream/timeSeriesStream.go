@@ -20,11 +20,11 @@ type Series struct {
 	Bs bitUtil.BitStream
 
 	// use for appendTimestamp()
-	prevTimeWrite      uint64
+	prevTimeWrite      int64
 	prevTimeDeltaWrite int64
 
 	// use for readNextTimestamp()
-	prevTimeRead      uint64
+	prevTimeRead      int64
 	prevTimeDeltaRead int64
 
 	// use for appendValue()
@@ -63,7 +63,7 @@ var timestampEncodings = []timestampEncoding{
 
 // Appends a (timestamp, value) pair to the current stream.
 // minTimestampDelta is the minimum timestamp delta
-func (s *Series) Append(timestamp uint64, value float64, minTimestampDelta int64) error {
+func (s *Series) Append(timestamp int64, value float64, minTimestampDelta int64) error {
 	if err := s.appendTimestamp(timestamp, minTimestampDelta); err != nil {
 		return err
 	}
@@ -72,7 +72,7 @@ func (s *Series) Append(timestamp uint64, value float64, minTimestampDelta int64
 }
 
 // Read a (timestamp, value) pair from the current stream.
-func (s *Series) Read() (timestamp uint64, value float64, err error) {
+func (s *Series) Read() (timestamp int64, value float64, err error) {
 	if timestamp, err = s.readNextTimestamp(); err != nil {
 		return 0, 0, err
 	}
@@ -92,8 +92,8 @@ func (s *Series) Read() (timestamp uint64, value float64, err error) {
 // '110' followed by a value length of 9
 // '1110' followed by a value length of 12
 // '1111' followed by a value length of 32
-func (s *Series) appendTimestamp(timestamp uint64, minTimestampDelta int64) error {
-	delta := int64(timestamp - s.prevTimeWrite)
+func (s *Series) appendTimestamp(timestamp int64, minTimestampDelta int64) error {
+	delta := timestamp - s.prevTimeWrite
 	// Skip the minTimestampDelta check for the first timestamp.
 	if delta < minTimestampDelta && s.prevTimeWrite != 0 {
 		return errors.New("Timestamp delta is smaller than minTimestampDelta!")
@@ -101,7 +101,7 @@ func (s *Series) appendTimestamp(timestamp uint64, minTimestampDelta int64) erro
 
 	if len(s.Bs.Stream) == 0 {
 		// Store the first timestamp
-		s.Bs.AddValueToBitStream(timestamp, BITS_FOR_FIRST_TIMESTAMP)
+		s.Bs.AddValueToBitStream(uint64(timestamp), BITS_FOR_FIRST_TIMESTAMP)
 		s.prevTimeWrite = timestamp
 		s.prevTimeDeltaWrite = DEFAULT_DELTA
 		return nil
@@ -127,8 +127,8 @@ func (s *Series) appendTimestamp(timestamp uint64, minTimestampDelta int64) erro
 			s.Bs.AddValueToBitStream(timestampEncodings[i].controlValue,
 				timestampEncodings[i].controlValueBitLength)
 			// Make this value between [0, 2^timestampEncodings[i].bitsForValue - 1]
-			encodedValue := uint64(deltaOfDelta + (1 << uint(timestampEncodings[i].bitsForValue-1)))
-			s.Bs.AddValueToBitStream(encodedValue, timestampEncodings[i].bitsForValue)
+			encodedValue := deltaOfDelta + (1 << uint(timestampEncodings[i].bitsForValue-1))
+			s.Bs.AddValueToBitStream(uint64(encodedValue), timestampEncodings[i].bitsForValue)
 			break
 		}
 	}
@@ -139,7 +139,7 @@ func (s *Series) appendTimestamp(timestamp uint64, minTimestampDelta int64) erro
 }
 
 // Read a timestamp fron the current stream.
-func (s *Series) readNextTimestamp() (uint64, error) {
+func (s *Series) readNextTimestamp() (int64, error) {
 	// first timestamp
 	if s.Bs.BitPos == 0 {
 		s.prevTimeDeltaRead = DEFAULT_DELTA
@@ -147,8 +147,8 @@ func (s *Series) readNextTimestamp() (uint64, error) {
 		if err != nil {
 			return 0, err
 		}
-		s.prevTimeRead = timestamp
-		return timestamp, nil
+		s.prevTimeRead = int64(timestamp)
+		return int64(timestamp), nil
 	}
 
 	index, err := s.Bs.FindTheFirstZeroBit(4)
@@ -173,7 +173,7 @@ func (s *Series) readNextTimestamp() (uint64, error) {
 		}
 		s.prevTimeDeltaRead += value
 	}
-	s.prevTimeRead += uint64(s.prevTimeDeltaRead)
+	s.prevTimeRead += s.prevTimeDeltaRead
 	return s.prevTimeRead, nil
 }
 

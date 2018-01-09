@@ -68,7 +68,7 @@ const (
 // This class appends data points to a log file.
 type DataLogWriter struct {
 	out_            *fileUtils.File
-	lastTimestamp_  uint64
+	lastTimestamp_  int64
 	buffer_         []byte
 	bufferSize_     uint64
 	previousvalues_ []float64
@@ -78,7 +78,7 @@ type DataLogReader struct {
 }
 
 // Initialize a DataLogWriter which will append data to the given file.
-func NewDataLogWriter(out *fileUtils.File, baseTime uint64) *DataLogWriter {
+func NewDataLogWriter(out *fileUtils.File, baseTime int64) *DataLogWriter {
 	res := &DataLogWriter{
 		out_:           out,
 		lastTimestamp_: baseTime,
@@ -118,7 +118,7 @@ func (d *DataLogWriter) FlushBuffer() error {
 // not thread safe. Caller is responsible for locking. Data will be
 // written to disk when buffer is full or `flushBuffer` is called or
 // destructor is called.
-func (d *DataLogWriter) Append(id, unixTime uint64, value float64) error {
+func (d *DataLogWriter) Append(id uint32, unixTime int64, value float64) error {
 	b := bitUtil.NewBitStream(nil)
 
 	if id > MAX_ALLOWED_TIMESERIES_ID {
@@ -129,15 +129,15 @@ func (d *DataLogWriter) Append(id, unixTime uint64, value float64) error {
 	// allow the best case scenario of time delta = 0 and value/xor = 0.
 	if id >= (1 << SHORT_ID_BITS) {
 		b.AddValueToBitStream(LONG_ID_CONTROL_BIT, 1)
-		b.AddValueToBitStream(id, LONG_ID_BITS)
+		b.AddValueToBitStream(uint64(id), LONG_ID_BITS)
 	} else {
 		b.AddValueToBitStream(SHORT_ID_CONTROL_BIT, 1)
-		b.AddValueToBitStream(id, SHORT_ID_BITS)
+		b.AddValueToBitStream(uint64(id), SHORT_ID_BITS)
 	}
 
 	// Optimize for zero delta case and increase used bits 8 at a time
 	// to fill bytes.
-	delta := int64(unixTime - d.lastTimestamp_)
+	delta := unixTime - d.lastTimestamp_
 	if delta == 0 {
 		b.AddValueToBitStream(ZERO_DELTA_CONTROL_VALUE, 1)
 	} else if delta >= SHORT_DELTA_MIN && delta <= SHORT_DELTA_MAX {
@@ -162,11 +162,11 @@ func (d *DataLogWriter) Append(id, unixTime uint64, value float64) error {
 		b.AddValueToBitStream(uint64(delta), LARGE_DELTA_BITS)
 	}
 
-	if id >= uint64(len(d.previousvalues_)) {
+	if id >= uint32(len(d.previousvalues_)) {
 		// If the value hasn't been seen before, assume that the previous
 		// value is zero.
 		tmpSlice := make([]float64, id+PREVIOUS_VALUE_VECTOR_SIZE_INCREMENT-
-			uint64(len(d.previousvalues_)))
+			uint32(len(d.previousvalues_)))
 		d.previousvalues_ = append(d.previousvalues_, tmpSlice...)
 	}
 
@@ -213,8 +213,8 @@ func (d *DataLogWriter) Append(id, unixTime uint64, value float64) error {
 // Pull all the data points from the file.
 // Returns the number of points read, or -1 if the file could not be read.
 // The callback should return false if reading should be stopped.
-func (d *DataLogReader) ReadLog(file *fileUtils.File, baseTime uint64,
-	f func(uint64, uint64, float64) (out bool)) (points int, err error) {
+func ReadLog(file *fileUtils.File, baseTime int64,
+	f func(uint32, int64, float64) (out bool)) (points int, err error) {
 
 	stream, err := ioutil.ReadAll(file.File)
 	if err != nil {
@@ -237,18 +237,20 @@ func (d *DataLogReader) ReadLog(file *fileUtils.File, baseTime uint64,
 		if err != nil {
 			return -1, err
 		}
-		var id uint64
+		var id64 uint64
 		if idControlBit == SHORT_ID_CONTROL_BIT {
-			id, err = b.ReadValueFromBitStream(SHORT_ID_BITS)
+			id64, err = b.ReadValueFromBitStream(SHORT_ID_BITS)
 			if err != nil {
 				return points, err
 			}
 		} else {
-			id, err = b.ReadValueFromBitStream(LONG_ID_BITS)
+			id64, err = b.ReadValueFromBitStream(LONG_ID_BITS)
 			if err != nil {
 				return points, err
 			}
 		}
+
+		id := uint32(id64)
 
 		if id > MAX_ALLOWED_TIMESERIES_ID {
 			err = errors.New(fmt.Sprintf("Corrupt file. ID is too large %d", id))
@@ -292,12 +294,12 @@ func (d *DataLogReader) ReadLog(file *fileUtils.File, baseTime uint64,
 			return points, err
 		}
 
-		unixTime := uint64(int64(prevTime) + timeDalte)
+		unixTime := prevTime + timeDalte
 		prevTime = unixTime
 
-		if id >= uint64(len(previousValues)) {
+		if id >= uint32(len(previousValues)) {
 			tmpSlice := make([]float64, id+PREVIOUS_VALUE_VECTOR_SIZE_INCREMENT-
-				uint64(len(previousValues)))
+				uint32(len(previousValues)))
 			previousValues = append(previousValues, tmpSlice...)
 		}
 

@@ -15,19 +15,23 @@ type DataBlockReader struct {
 	completedFiles_ *fileUtils.FileUtils
 }
 
-func NewDataBlockReader(shardId int, dataDiretory *string) *DataBlockReader {
-	res := new(DataBlockReader)
-	dataPrefix := dataTypes.DATA_PRE_FIX
-	res.dataFiles_ = fileUtils.NewFileUtils(shardId, &dataPrefix, dataDiretory)
-	completePrefix := dataTypes.COMPLETE_PREFIX
-	res.completedFiles_ = fileUtils.NewFileUtils(shardId, &completePrefix, dataDiretory)
+var (
+	dataPrefix     = dataTypes.DATA_PRE_FIX
+	completePrefix = dataTypes.COMPLETE_PREFIX
+)
+
+func NewDataBlockReader(shardId int64, dataDiretory string) *DataBlockReader {
+	res := &DataBlockReader{
+		dataFiles_:      fileUtils.NewFileUtils(shardId, dataPrefix, dataDiretory),
+		completedFiles_: fileUtils.NewFileUtils(shardId, completePrefix, dataDiretory),
+	}
 	return res
 }
 
 // Returns allocated blocks for every page in the given position.
 // Fills in timeSeriesIds and storageIds with the metadata associated with
 // the blocks.
-func (d *DataBlockReader) ReadBlocks(position uint) (pointers [](*dataTypes.DataBlock),
+func (d *DataBlockReader) ReadBlocks(position uint32) (pointers [](*dataTypes.DataBlock),
 	timeSeriesIds []uint32, storageIds []uint64, err error) {
 
 	f, err := d.dataFiles_.Open(int(position), "r")

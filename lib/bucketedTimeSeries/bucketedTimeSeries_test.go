@@ -30,18 +30,18 @@ func TestPutAndGet(t *testing.T) {
 
 	var b BucketedTimeSeries
 	b.Reset(5)
-	storage := bucketStorage.NewBueketStorage(5, 1, &dataDirectory)
+	storage := bucketStorage.NewBueketStorage(5, 1, dataDirectory)
 
 	// input no.7 bucket
 	for _, dp := range inputData1 {
-		err := b.Put(7, timeSeriesId, &dp, storage, nil)
+		err := b.Put(7, timeSeriesId, dp, storage, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	// Input into a old bucket
-	err := b.Put(6, timeSeriesId, &TestData[0], storage, nil)
+	err := b.Put(6, timeSeriesId, TestData[0], storage, nil)
 	if err == nil || err.Error() != "Invalid bucket number!" {
 		t.Fatal("Wrong err message when input into a old bucket!")
 	}
@@ -55,7 +55,7 @@ func TestPutAndGet(t *testing.T) {
 	// input no.8 bucket
 	var category uint16 = 2
 	for _, dp := range inputData2 {
-		err := b.Put(8, timeSeriesId, &dp, storage, &category)
+		err := b.Put(8, timeSeriesId, dp, storage, &category)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -110,15 +110,15 @@ func TestSetCurretBucket(t *testing.T) {
 
 	var b BucketedTimeSeries
 	b.Reset(5)
-	storage := bucketStorage.NewBueketStorage(5, 1, &dataDirectory)
+	storage := bucketStorage.NewBueketStorage(5, 1, dataDirectory)
 	for _, dp := range inputData1 {
-		err := b.Put(7, timeSeriesId, &dp, storage, nil)
+		err := b.Put(7, timeSeriesId, dp, storage, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	b.SetCurretBucket(8, timeSeriesId, storage)
+	b.SetCurrentBucket(8, timeSeriesId, storage)
 	if b.current_ != 8 {
 		t.Fatal("b.current_ not match!")
 	}

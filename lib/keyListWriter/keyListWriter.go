@@ -1,4 +1,4 @@
-package KeyListWriter
+package keyListWriter
 
 import (
 	"fmt"
@@ -51,7 +51,7 @@ func (k *KeyListWriter) DeleteKeyListWriter() {
 }
 
 // Copy a new key onto the queue for writing.
-func (k *KeyListWriter) addKey(shardId int64, id int32, key string, category uint16) {
+func (k *KeyListWriter) AddKey(shardId int64, id int32, key string, category uint16) {
 	var info KeyInfo
 	info.shardId = shardId
 	info.key = key
@@ -63,7 +63,7 @@ func (k *KeyListWriter) addKey(shardId int64, id int32, key string, category uin
 }
 
 // Pass a compaction call down to the appropriate PersistentKeyList.
-func (k *KeyListWriter) compact(shardId int64, generator func() persistentKeyList.KeyItem) error {
+func (k *KeyListWriter) Compact(shardId int64, generator func() persistentKeyList.KeyItem) error {
 	writer := k.get(shardId)
 	if writer == nil {
 		return fmt.Errorf("Trying to compact non-enabled shard %d", shardId)
@@ -75,14 +75,14 @@ func (k *KeyListWriter) compact(shardId int64, generator func() persistentKeyLis
 	return nil
 }
 
-func (k *KeyListWriter) startShard(shardId int64) {
+func (k *KeyListWriter) StartShard(shardId int64) {
 	var info KeyInfo
 	info.shardId = shardId
 	info.keyType = START_SHARD
 	k.keyInfoQueue_ <- info
 }
 
-func (k *KeyListWriter) stopShard(shardId int64) {
+func (k *KeyListWriter) StopShard(shardId int64) {
 	var info KeyInfo
 	info.shardId = shardId
 	info.keyType = STOP_SHARD

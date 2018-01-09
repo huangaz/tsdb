@@ -8,6 +8,7 @@ import (
 	"github.com/huangaz/tsdb/lib/timeSeriesStream"
 	"github.com/huangaz/tsdb/lib/utils"
 	"math"
+	"sync"
 )
 
 const (
@@ -30,6 +31,8 @@ type BucketedTimeSeries struct {
 
 	// Blocks of metadata for previous data.
 	blocks_ []uint64
+
+	lock_ sync.Mutex
 }
 
 // Initialize a BucketedTimeSeries with n historical buckets and
@@ -91,8 +94,11 @@ func (b *BucketedTimeSeries) open(next, timeSeriesId uint32,
 // If category pointer is defined, sets the category.
 // `i`: the number of bucket to store data
 // `dp`: data point to be stored
-func (b *BucketedTimeSeries) Put(i, timeSeriesId uint32, dp *dataTypes.DataPoint,
+func (b *BucketedTimeSeries) Put(i, timeSeriesId uint32, dp dataTypes.DataPoint,
 	storage *bucketStorage.BucketStorage, category *uint16) (err error) {
+
+	b.lock_.Lock()
+	defer b.lock_.Unlock()
 
 	if i < b.current_ {
 		return errors.New("Invalid bucket number!")
@@ -123,6 +129,9 @@ func (b *BucketedTimeSeries) Get(begin, end uint32,
 	storage *bucketStorage.BucketStorage) (out []dataTypes.TimeSeriesBlock, err error) {
 
 	n := storage.NumBuckets()
+
+	b.lock_.Lock()
+	defer b.lock_.Unlock()
 
 	getCurrent := begin <= b.current_ && end >= b.current_
 
@@ -164,8 +173,11 @@ func (b *BucketedTimeSeries) Get(begin, end uint32,
 
 // Sets the current bucket. Flushes data from the previous bucket to
 // BucketStorage. No-op if this time series is already at currentBucket.
-func (b *BucketedTimeSeries) SetCurretBucket(currentBucket, timeSeriesId uint32,
+func (b *BucketedTimeSeries) SetCurrentBucket(currentBucket, timeSeriesId uint32,
 	storage *bucketStorage.BucketStorage) (err error) {
+
+	b.lock_.Lock()
+	defer b.lock_.Unlock()
 
 	if b.current_ < currentBucket {
 		err = b.open(currentBucket, timeSeriesId, storage)
@@ -182,6 +194,8 @@ func (b *BucketedTimeSeries) SetQueried() {
 }
 
 func (b *BucketedTimeSeries) SetDataBlock(position uint32, numBuckets uint8, id uint64) {
+	b.lock_.Lock()
+	defer b.lock_.Unlock()
 	// Needed for time series that receive data very rarely.
 	if position >= b.current_ {
 		b.current_ = position + 1
@@ -193,6 +207,9 @@ func (b *BucketedTimeSeries) SetDataBlock(position uint32, numBuckets uint8, id 
 
 // Returns true if there are data points for this time series.
 func (b *BucketedTimeSeries) HasDataPoints(numBuckets uint8) bool {
+	b.lock_.Lock()
+	defer b.lock_.Unlock()
+
 	if b.count_ > 0 {
 		return true
 	}
@@ -213,10 +230,14 @@ func (b *BucketedTimeSeries) GetQueriedBucketsAgo() uint8 {
 
 // Returns the ODS category associated with this time series.
 func (b *BucketedTimeSeries) GetCategory() uint16 {
+	b.lock_.Lock()
+	defer b.lock_.Unlock()
 	return b.stream_.ExtraData
 }
 
 // Sets the ODS category for this time series.
 func (b *BucketedTimeSeries) SetCategory(category uint16) {
+	b.lock_.Lock()
+	defer b.lock_.Unlock()
 	b.stream_.ExtraData = category
 }

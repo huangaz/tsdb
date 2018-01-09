@@ -9,7 +9,7 @@ import (
 var (
 	prefix        = testUtil.DataPrefix
 	dataDirectory = testUtil.DataDirectory_Test
-	f             = NewFileUtils(1, &prefix, &dataDirectory)
+	f             = NewFileUtils(1, prefix, dataDirectory)
 )
 
 func TestLs(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 var (
 	// dataDirectory_Test  = "/tmp/path_test"
 	// shardDirectory_Test = dataDirectory_Test + "/1"
-	d = NewDataBlockReader(1, &testUtil.DataDirectory_Test)
+	d = NewDataBlockReader(1, testUtil.DataDirectory_Test)
 	//d = NewDataBlockReader(1, &dataDirectory_Test)
 )
 
@@ -71,7 +71,7 @@ func TestReadBlocks(t *testing.T) {
 	binary.BigEndian.PutUint32(byteSlice, uint32(1))
 	f.File.Write(byteSlice)
 	_, _, _, err = d.ReadBlocks(1)
-	want = "Corrupt data file: expected 65555 bytes, got 8 bytes. " + filePath
+	want = "Corrupt data file: expected 65556 bytes, got 8 bytes. " + filePath
 	if err == nil || err.Error() != want {
 		t.Fatalf("wrong error message for corrupt file!\n want: %v\n get : %v", want, err.Error())
 	}
@@ -83,7 +83,7 @@ func TestReadBlocks(t *testing.T) {
 	byteSlice_64 := make([]byte, 8)
 	binary.BigEndian.PutUint64(byteSlice_64, uint64(200))
 	f.File.Write(byteSlice_64)
-	os.Truncate(filePath, 65555)
+	os.Truncate(filePath, 65556)
 
 	pointers, timeSeriesIds, storageIds, err := d.ReadBlocks(1)
 	if err != nil {

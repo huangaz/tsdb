@@ -26,7 +26,7 @@ func TestWriteSingleValue(t *testing.T) {
 	testUtil.SingleFileCreate(path, unixTime)
 	defer testUtil.FileDelete()
 
-	fileUtil := fileUtils.NewFileUtils(int(shardId), &logPrefix, &dataDirectory)
+	fileUtil := fileUtils.NewFileUtils(shardId, logPrefix, dataDirectory)
 	// fileUtil.ClearAll()
 
 	writer := NewBucketLogWriter(windowSize, &dataDirectory, 10, 0)
@@ -34,9 +34,9 @@ func TestWriteSingleValue(t *testing.T) {
 		t.Fatal("Create new bucketLogWriter failed!")
 	}
 
-	writer.startShard(shardId)
-	writer.logData(shardId, 37, unixTime, 38.0)
-	writer.stopShard(shardId)
+	writer.StartShard(shardId)
+	writer.LogData(shardId, 37, unixTime, 38.0)
+	writer.StopShard(shardId)
 	// 	writer.flushQueue()
 
 	time.Sleep(100 * time.Millisecond)
@@ -60,19 +60,19 @@ func TestThreadWrite(t *testing.T) {
 	testUtil.PathCreate(shardId)
 	defer testUtil.FileDelete()
 
-	fileUtil := fileUtils.NewFileUtils(int(shardId), &logPrefix, &dataDirectory)
+	fileUtil := fileUtils.NewFileUtils(shardId, logPrefix, dataDirectory)
 
 	writer := NewBucketLogWriter(windowSize, &dataDirectory, 10, 0)
 	if writer == nil {
 		t.Fatal("Create new bucketLogWriter failed!")
 	}
 
-	writer.startShard(shardId)
-	writer.logData(shardId, 37, ts1, 1.0)
-	writer.logData(shardId, 38, ts2, 2.0)
-	writer.logData(shardId, 39, ts3, 3.0)
-	writer.logData(shardId, 40, ts4, 4.0)
-	writer.stopShard(shardId)
+	writer.StartShard(shardId)
+	writer.LogData(shardId, 37, ts1, 1.0)
+	writer.LogData(shardId, 38, ts2, 2.0)
+	writer.LogData(shardId, 39, ts3, 3.0)
+	writer.LogData(shardId, 40, ts4, 4.0)
+	writer.StopShard(shardId)
 	// writer.flushQueue()
 
 	time.Sleep(100 * time.Millisecond)
@@ -82,13 +82,12 @@ func TestThreadWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer f.File.Close()
-	var reader dataLog.DataLogReader
-	var ids []uint64
+	var ids []uint32
 	var unixTimes []int64
 	var values []float64
-	points, err := reader.ReadLog(&f, uint64(ts1), func(_id, _time uint64, _value float64) bool {
+	points, err := dataLog.ReadLog(&f, ts1, func(_id uint32, _time int64, _value float64) bool {
 		ids = append(ids, _id)
-		unixTimes = append(unixTimes, int64(_time))
+		unixTimes = append(unixTimes, _time)
 		values = append(values, _value)
 		return true
 	})
@@ -96,7 +95,7 @@ func TestThreadWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedIds := []uint64{37, 38}
+	expectedIds := []uint32{37, 38}
 	expectedTimes := []int64{ts1, ts2}
 	expectedValues := []float64{1.0, 2.0}
 
@@ -118,7 +117,7 @@ func TestThreadWrite(t *testing.T) {
 	writer.DeleteBucketLogWriter()
 }
 
-func readSingleValueFromLog(fileUtils fileUtils.FileUtils, shardId int64, expectedId uint64,
+func readSingleValueFromLog(fileUtils fileUtils.FileUtils, shardId int64, expectedId uint32,
 	expectedUnixTime int64, expectedValue float64, windowSize uint64) error {
 
 	baseTime := expectedUnixTime
@@ -134,13 +133,12 @@ func readSingleValueFromLog(fileUtils fileUtils.FileUtils, shardId int64, expect
 	}
 	defer f.File.Close()
 
-	var reader dataLog.DataLogReader
-	var id uint64
+	var id uint32
 	var unixTime int64
 	var value float64
-	points, err := reader.ReadLog(&f, uint64(baseTime), func(_id, _time uint64, _value float64) bool {
+	points, err := dataLog.ReadLog(&f, baseTime, func(_id uint32, _time int64, _value float64) bool {
 		id = _id
-		unixTime = int64(_time)
+		unixTime = _time
 		value = _value
 		return true
 	})
