@@ -157,10 +157,14 @@ func NewBucketMap(buckets uint8, windowSize uint64, shardId int64, dataDirectory
 		freeList_:       priorityQueue.NewPriorityQueue(),
 		dataPointQueue_: make(chan QueueDataPoint, DATA_POINT_QUEUE_SIZE),
 	}
+	return res
+}
 
-	// res.rows_
-	// res.rowsFromDisk_
-	// res.addTimer_
+func NewItem(key string) *Item {
+	res := &Item{
+		key: key,
+		s:   bucketedTimeSeries.NewBucketedTimeSeries(),
+	}
 	return res
 }
 
@@ -228,8 +232,7 @@ func (b *BucketMap) Put(key string, value dataTypes.DataPoint, category uint16,
 	bucketNum := b.bucket(value.Timestamp)
 
 	// Prepare a row now to minimize critical section.
-	newRow := &Item{}
-	newRow.key = key
+	newRow := NewItem(key)
 	newRow.s.Reset(b.n_)
 	newRow.s.Put(bucketNum, 0, value, b.storage_, &category)
 
@@ -448,6 +451,7 @@ func (b *BucketMap) compactKeyList() {
 }
 
 func (b *BucketMap) deleteOldBlockFiles() error {
+	// Start far enough back that we can't possibly interfere with anything.
 	err := b.storage_.DeleteBucketOlderThan(b.bucket(time.Now().Unix()) - uint32(b.n_) - 1)
 	if err != nil {
 		return err
@@ -483,22 +487,22 @@ func (b *BucketMap) readKeyList() error {
 			newRows := make([]*Item, int(item.Id)+ROWS_AT_A_TIME-len(b.rows_))
 			b.rows_ = append(b.rows_, newRows...)
 		}
-		var newItem Item
-		newItem.key = item.Key
+
+		newItem := NewItem(item.Key)
 		newItem.s.Reset(b.n_)
 		newItem.s.SetCategory(item.Category)
-		b.rows_[item.Id] = &newItem
+		b.rows_[item.Id] = newItem
 
 		return true
 	})
 
 	b.tableSize_ = uint32(len(b.rows_))
-	//map.reserve
 
 	// Put all the rows in either the map or the free list.
 	for i, it := range b.rows_ {
 		if it != nil {
 			if _, ok := b.map_[it.key]; ok {
+				// Ignore keys that already exist.
 				b.rows_[i] = nil
 				b.freeList_.Push(i)
 			} else {
@@ -523,8 +527,6 @@ func (b *BucketMap) setState(state int) bool {
 	if state < PRE_UNOWNED || state > OWNED {
 		return false
 	}
-
-	Timer := timer.NewTimer(true)
 
 	b.rwLock_.Lock()
 
@@ -557,7 +559,7 @@ func (b *BucketMap) setState(state int) bool {
 		b.addTimer_.Stop()
 	}
 
-	oldState := b.state_
+	// oldState := b.state_
 	b.state_ = state
 	b.rwLock_.Unlock()
 
@@ -569,9 +571,10 @@ func (b *BucketMap) setState(state int) bool {
 		b.storage_.ClearAndDisable()
 	}
 
-	log.Printf("Change state of shard %d from %s to %s in %ds. ", b.shardId_, stateString(oldState),
-		stateString(state), Timer.Get)
-
+	/*
+		log.Printf("Change state of shard %d from %s to %s. ", b.shardId_, stateString(oldState),
+			stateString(state))
+	*/
 	return true
 }
 
@@ -600,18 +603,7 @@ func (b *BucketMap) readData() (err error) {
 		b.checkForMissingBlockFiles()
 		b.lastFinalizedBucket_ = uint32(b.unreadBlockFiles_[l-1])
 	}
-	/*
-		ids, err := reader.FindCompletedBlockFiles()
-		if err != nil {
-			b.mutex_.Unlock()
-			return err
-		}
-		if len(ids) > 0 {
-			b.lastFinalizedBucket_ = uint32(ids[len(ids)-1])
-			copy(b.unreadBlockFiles_, ids)
-			b.checkForMissingBlockFiles()
-		}
-	*/
+
 	b.mutex_.Unlock()
 
 	b.readLogFiles(b.lastFinalizedBucket_)
@@ -638,8 +630,6 @@ func (b *BucketMap) readData() (err error) {
 	// the queue after it was emptied and before the state was set to
 	// READING_BLOCK_DATA.
 	b.processQueueDataPoints(false)
-
-	// reset dataPointQueue_?
 
 	return nil
 }
@@ -679,7 +669,7 @@ func (b *BucketMap) readLogFiles(lastBlock uint32) error {
 	}
 	for _, id := range ids {
 		if int64(id) < b.timestamp(lastBlock+1) {
-			log.Printf("Skipping log file %d because it's already covered by a block", id)
+			// log.Printf("Skipping log file %d because it's already covered by a block", id)
 			continue
 		}
 
@@ -717,10 +707,11 @@ func (b *BucketMap) readLogFiles(lastBlock uint32) error {
 
 			gap := unixTime - lastTimestamp
 			if gap > MISSING_LOGS_THRESHOLD_SECS && lastTimestamp > b.timestamp(1) {
-				log.Printf("%d seconds of missing logs from %d to %d for shard %d",
-					gap, lastTimestamp, unixTime, b.shardId_)
+				// log.Printf("%d seconds of missing logs from %d to %d for shard %d",
+				// gap, lastTimestamp, unixTime, b.shardId_)
 				b.reliableDataStartTime_ = unixTime
 			}
+
 			if unixTime > lastTimestamp {
 				lastTimestamp = unixTime
 			}
@@ -732,8 +723,8 @@ func (b *BucketMap) readLogFiles(lastBlock uint32) error {
 	now := time.Now().Unix()
 	gap := now - lastTimestamp
 	if gap > MISSING_LOGS_THRESHOLD_SECS && lastTimestamp > b.timestamp(1) {
-		log.Printf("%d seconds of missing logs from %d to now(%d) for shard %d",
-			gap, lastTimestamp, now, b.shardId_)
+		// log.Printf("%d seconds of missing logs from %d to now(%d) for shard %d",
+		// 	gap, lastTimestamp, now, b.shardId_)
 		b.reliableDataStartTime_ = now
 	}
 	return nil

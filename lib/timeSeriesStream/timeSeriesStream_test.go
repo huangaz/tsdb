@@ -8,7 +8,7 @@ import (
 var TestData = testUtil.TestData
 
 func TestAppendAndRead(t *testing.T) {
-	var s Series
+	s := NewSeries()
 	for _, p := range TestData {
 		err := s.Append(p.Timestamp, p.Value, 1)
 		if err != nil {

@@ -19,7 +19,7 @@ const (
 
 type BucketedTimeSeries struct {
 	// Current stream of data.
-	stream_ timeSeriesStream.Series
+	stream_ *timeSeriesStream.Series
 
 	// Number of points in the active bucket (stream_)
 	count_ uint16
@@ -33,6 +33,13 @@ type BucketedTimeSeries struct {
 	blocks_ []uint64
 
 	lock_ sync.Mutex
+}
+
+func NewBucketedTimeSeries() *BucketedTimeSeries {
+	res := &BucketedTimeSeries{
+		stream_: timeSeriesStream.NewSeries(),
+	}
+	return res
 }
 
 // Initialize a BucketedTimeSeries with n historical buckets and

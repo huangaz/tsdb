@@ -15,7 +15,8 @@ var (
 )
 
 func TestReset(t *testing.T) {
-	var b BucketedTimeSeries
+	//var b BucketedTimeSeries
+	b := NewBucketedTimeSeries()
 	b.Reset(5)
 	if b.queriedBucketsAgo_ != 255 || len(b.blocks_) != 5 {
 		t.Fatal("Reset() failed!")
@@ -28,7 +29,8 @@ func TestPutAndGet(t *testing.T) {
 	inputBlock1 := timeSeries.WriteValues(inputData1)
 	inputBlock2 := timeSeries.WriteValues(inputData2)
 
-	var b BucketedTimeSeries
+	// var b BucketedTimeSeries
+	b := NewBucketedTimeSeries()
 	b.Reset(5)
 	storage := bucketStorage.NewBueketStorage(5, 1, dataDirectory)
 
@@ -108,7 +110,8 @@ func TestPutAndGet(t *testing.T) {
 func TestSetCurretBucket(t *testing.T) {
 	inputData1 := TestData[:5]
 
-	var b BucketedTimeSeries
+	// var b BucketedTimeSeries
+	b := NewBucketedTimeSeries()
 	b.Reset(5)
 	storage := bucketStorage.NewBueketStorage(5, 1, dataDirectory)
 	for _, dp := range inputData1 {
@@ -126,7 +129,8 @@ func TestSetCurretBucket(t *testing.T) {
 }
 
 func TestSetDataBlock(t *testing.T) {
-	var b BucketedTimeSeries
+	// var b BucketedTimeSeries
+	b := NewBucketedTimeSeries()
 	b.Reset(5)
 
 	b.SetDataBlock(8, 5, 100)

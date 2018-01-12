@@ -3,8 +3,15 @@ package testUtil
 import (
 	"fmt"
 	"github.com/huangaz/tsdb/lib/dataTypes"
+	"math/rand"
 	"os"
 	"strconv"
+	"time"
+)
+
+const (
+	letters         = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	lengthOfLetters = len(letters)
 )
 
 var (
@@ -116,4 +123,15 @@ func IsEqualIntSlice(s1, s2 []int) bool {
 		}
 	}
 	return true
+}
+
+func RandStr(length int) string {
+	res := make([]byte, length)
+	rand.Seed(time.Now().UnixNano())
+
+	for i := range res {
+		res[i] = letters[rand.Intn(lengthOfLetters)]
+	}
+
+	return string(res)
 }

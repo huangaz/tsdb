@@ -29,7 +29,7 @@ func TestWriteSingleValue(t *testing.T) {
 	fileUtil := fileUtils.NewFileUtils(shardId, logPrefix, dataDirectory)
 	// fileUtil.ClearAll()
 
-	writer := NewBucketLogWriter(windowSize, &dataDirectory, 10, 0)
+	writer := NewBucketLogWriter(windowSize, dataDirectory, 10, 0)
 	if writer == nil {
 		t.Fatal("Create new bucketLogWriter failed!")
 	}
@@ -62,7 +62,7 @@ func TestThreadWrite(t *testing.T) {
 
 	fileUtil := fileUtils.NewFileUtils(shardId, logPrefix, dataDirectory)
 
-	writer := NewBucketLogWriter(windowSize, &dataDirectory, 10, 0)
+	writer := NewBucketLogWriter(windowSize, dataDirectory, 10, 0)
 	if writer == nil {
 		t.Fatal("Create new bucketLogWriter failed!")
 	}

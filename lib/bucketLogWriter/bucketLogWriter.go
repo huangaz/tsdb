@@ -62,12 +62,12 @@ func NewShardWriter() *ShardWriter {
 	return res
 }
 
-func NewBucketLogWriter(windowSize uint64, dataDirectory *string, queueSize,
+func NewBucketLogWriter(windowSize uint64, dataDirectory string, queueSize,
 	allowTimestampBehind uint32) *BucketLogWriter {
 
 	res := &BucketLogWriter{
 		windowSize_:             windowSize,
-		dataDirectory_:          *dataDirectory,
+		dataDirectory_:          dataDirectory,
 		waitTimeBeforeClosing_:  allowTimestampBehind * 2,
 		keepLogFilesAroundTime_: bucketUtils.Duration(2, windowSize),
 		logDataQueue_:           make(chan LogDataInfo, queueSize),

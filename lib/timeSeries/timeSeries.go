@@ -7,7 +7,7 @@ import (
 
 // Build a TimeSeriesBlock from the given data points.
 func WriteValues(dps []dataTypes.DataPoint) (block dataTypes.TimeSeriesBlock) {
-	var s timeSeriesStream.Series
+	s := timeSeriesStream.NewSeries()
 
 	for _, dp := range dps {
 		err := s.Append(dp.Timestamp, dp.Value, 0)

@@ -3,8 +3,9 @@ package timeSeriesStream
 
 import (
 	"errors"
-	"github.com/huangaz/tsdb/lib/bitUtil"
 	"math"
+
+	"github.com/huangaz/tsdb/lib/bitUtil"
 )
 
 const (
@@ -17,7 +18,7 @@ const (
 )
 
 type Series struct {
-	Bs bitUtil.BitStream
+	Bs *bitUtil.BitStream
 
 	// use for appendTimestamp()
 	prevTimeWrite      int64
@@ -59,6 +60,13 @@ var timestampEncodings = []timestampEncoding{
 	{9, 6, 3},
 	{12, 14, 4},
 	{32, 15, 4},
+}
+
+func NewSeries() *Series {
+	res := &Series{
+		Bs: bitUtil.NewBitStream(nil),
+	}
+	return res
 }
 
 // Appends a (timestamp, value) pair to the current stream.
