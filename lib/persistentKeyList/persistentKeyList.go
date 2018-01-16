@@ -1,5 +1,3 @@
-// class PersistentKeyList
-//
 // Keeps an on-disk list of (key_id, key_string) pairs.
 // This class is thread-safe, but no attempt is made at managing the concurrency
 // of the file itself.
@@ -315,6 +313,10 @@ func (p *PersistentKeyList) appendBuffer(buffer *[]byte, item KeyItem) {
 	*buffer = append(*buffer, tmpBuffer...)
 }
 
+// Rewrite and compress the file to contain only the generated
+// entries. Continues generating until receiving a nullptr key.
+// This function should only be called by a single thread at a time,
+// but concurrent calls to appendKey() are safe.
 func (p *PersistentKeyList) Compact(generator func() KeyItem) error {
 	// Directly appends to a new file.
 	prev, err := p.openNext()

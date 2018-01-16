@@ -41,12 +41,12 @@ func TestMode_Atoi(t *testing.T) {
 		{"a", os.O_APPEND},
 	}
 	for _, test := range tests {
-		res, _ := f.Mode_Atoi(test.input)
+		res, _ := f.mode_Atoi(test.input)
 		if res != test.want {
-			t.Fatalf("Mode_Atoi(%q) = %v\n", test.input, test.want)
+			t.Fatalf("mode_Atoi(%q) = %v\n", test.input, test.want)
 		}
 	}
-	_, err := f.Mode_Atoi("test")
+	_, err := f.mode_Atoi("test")
 	if err == nil || err.Error() != "invalid mode!" {
 		t.Fatal("Wrong err message!")
 	}
@@ -154,7 +154,7 @@ func TestOpen(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer f.Close(res)
-	if res.File.Name() != f.FilePath(1) {
-		t.Fatalf("Wrong FilePath! Want %s, get %s\n", f.FilePath(1), res.File.Name())
+	if res.File.Name() != f.filePath(1) {
+		t.Fatalf("Wrong filePath! Want %s, get %s\n", f.filePath(1), res.File.Name())
 	}
 }

@@ -33,9 +33,9 @@ func NewFileUtils(shardId int64, prefix, dataDirectory string) *FileUtils {
 
 // Get the file with the given id
 func (f *FileUtils) Open(id int, mode string) (res File, err error) {
-	path := f.FilePath(id)
+	path := f.filePath(id)
 
-	flag, err := f.Mode_Atoi(mode)
+	flag, err := f.mode_Atoi(mode)
 	if err != nil {
 		return res, err
 	}
@@ -50,7 +50,7 @@ func (f *FileUtils) Open(id int, mode string) (res File, err error) {
 }
 
 // Convert from string to int for "mode" in os.OpenFile()
-func (f *FileUtils) Mode_Atoi(mode string) (flag int, err error) {
+func (f *FileUtils) mode_Atoi(mode string) (flag int, err error) {
 	switch mode {
 	case "w":
 		flag = os.O_WRONLY
@@ -71,7 +71,7 @@ func (f *FileUtils) Mode_Atoi(mode string) (flag int, err error) {
 }
 
 // Return the file path as a string with the given id.
-func (f *FileUtils) FilePath(id int) string {
+func (f *FileUtils) filePath(id int) string {
 	return f.directory_ + "/" + f.prefix_ + "." + strconv.Itoa(id)
 }
 
@@ -103,7 +103,7 @@ func (f *FileUtils) ClearAll() error {
 
 // Remove a file with the given id.
 func (f *FileUtils) Remove(id int) error {
-	path := f.FilePath(id)
+	path := f.filePath(id)
 	err := os.Remove(path)
 	if err != nil {
 		return err
@@ -139,8 +139,8 @@ func (f *FileUtils) Ls() (ids []int, err error) {
 
 // Rename a file.
 func (f *FileUtils) Rename(from, to int) error {
-	originalPath := f.FilePath(from)
-	newPath := f.FilePath(to)
+	originalPath := f.filePath(from)
+	newPath := f.filePath(to)
 	err := os.Rename(originalPath, newPath)
 	if err != nil {
 		return err

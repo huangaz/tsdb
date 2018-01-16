@@ -37,7 +37,7 @@ type BucketedTimeSeries struct {
 
 func NewBucketedTimeSeries() *BucketedTimeSeries {
 	res := &BucketedTimeSeries{
-		stream_: timeSeriesStream.NewSeries(),
+		stream_: timeSeriesStream.NewSeries(nil),
 	}
 	return res
 }

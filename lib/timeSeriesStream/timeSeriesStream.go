@@ -3,9 +3,11 @@ package timeSeriesStream
 
 import (
 	"errors"
+	"fmt"
 	"math"
 
 	"github.com/huangaz/tsdb/lib/bitUtil"
+	"github.com/huangaz/tsdb/lib/dataTypes"
 )
 
 const (
@@ -62,9 +64,9 @@ var timestampEncodings = []timestampEncoding{
 	{32, 15, 4},
 }
 
-func NewSeries() *Series {
+func NewSeries(data []byte) *Series {
 	res := &Series{
-		Bs: bitUtil.NewBitStream(nil),
+		Bs: bitUtil.NewBitStream(data),
 	}
 	return res
 }
@@ -79,6 +81,7 @@ func (s *Series) Append(timestamp int64, value float64, minTimestampDelta int64)
 	return nil
 }
 
+/*
 // Read a (timestamp, value) pair from the current stream.
 func (s *Series) Read() (timestamp int64, value float64, err error) {
 	if timestamp, err = s.readNextTimestamp(); err != nil {
@@ -89,6 +92,7 @@ func (s *Series) Read() (timestamp int64, value float64, err error) {
 	}
 	return
 }
+*/
 
 // Append a timestamp in the current stream.
 // timestamp:0-4294967295
@@ -307,4 +311,43 @@ func (s *Series) Reset() {
 // Return the stream as a byte slice.
 func (s *Series) ReadData() []byte {
 	return s.Bs.Stream
+}
+
+// Extract the at most n values that are between begin and end inclusive
+// and put them in a vector. Assumes there are n values in the series.
+func ReadValues(data []byte, begin, end int64, n int) (out []dataTypes.DataPoint, err error) {
+
+	if len(data) == 0 || n <= 0 {
+		return nil, fmt.Errorf("null")
+	}
+
+	s := NewSeries(data)
+
+	for i := 0; i < n; i++ {
+		unixTime, err := s.readNextTimestamp()
+		if err != nil {
+			return out, err
+		}
+		value, err := s.readNextValue()
+		if err != nil {
+			return out, err
+		}
+
+		if unixTime > end {
+			break
+		}
+
+		if unixTime >= begin {
+			addValueToOutput(&out, unixTime, value)
+		}
+	}
+
+	return out, nil
+}
+
+func addValueToOutput(out *[]dataTypes.DataPoint, unixTime int64, value float64) {
+	var dp dataTypes.DataPoint
+	dp.Timestamp = unixTime
+	dp.Value = value
+	*out = append(*out, dp)
 }

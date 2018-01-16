@@ -53,7 +53,7 @@ func (t *Timer) Stop() int64 {
 }
 
 // Returns total time and resets it. Restarts timer immediately.
-func (t *Timer) reset() int64 {
+func (t *Timer) Reset() int64 {
 	if t.running() {
 		t.record()
 		t.Start()

@@ -175,7 +175,7 @@ func NewItem(key string) *Item {
 func (b *BucketMap) Put(key string, value dataTypes.DataPoint, category uint16,
 	skipStateCheck bool) (newRows, dataPoints int, err error) {
 
-	state := b.getState()
+	state := b.GetState()
 	existingItem, id := b.getInternal(key)
 
 	// State check can only skipped when processing data points from the queue.
@@ -229,7 +229,7 @@ func (b *BucketMap) Put(key string, value dataTypes.DataPoint, category uint16,
 		}
 	}
 
-	bucketNum := b.bucket(value.Timestamp)
+	bucketNum := b.Bucket(value.Timestamp)
 
 	// Prepare a row now to minimize critical section.
 	newRow := NewItem(key)
@@ -349,7 +349,7 @@ func (b *BucketMap) queueDataPointWithId(id uint32, value dataTypes.DataPoint, c
 func (b *BucketMap) putDataPointWithId(timeSeries *bucketedTimeSeries.BucketedTimeSeries,
 	timeSeriesId uint32, value dataTypes.DataPoint, category uint16) bool {
 
-	bucketNum := b.bucket(value.Timestamp)
+	bucketNum := b.Bucket(value.Timestamp)
 
 	err := timeSeries.Put(bucketNum, timeSeriesId, value, b.storage_, &category)
 	if err != nil {
@@ -373,7 +373,7 @@ func (b *BucketMap) Get(key string) *Item {
 }
 
 // Get all the TimeSeries.
-func (b *BucketMap) getEverything() []*Item {
+func (b *BucketMap) GetEverything() []*Item {
 	b.rwLock_.RLock()
 	defer b.rwLock_.RUnlock()
 	res := make([]*Item, len(b.rows_))
@@ -382,7 +382,7 @@ func (b *BucketMap) getEverything() []*Item {
 }
 
 // Get some of the TimeSeries. Returns true if there is more data left.
-func (b *BucketMap) getSome(offset, count int) ([]*Item, bool) {
+func (b *BucketMap) GetSome(offset, count int) ([]*Item, bool) {
 	b.rwLock_.RLock()
 	defer b.rwLock_.RUnlock()
 
@@ -399,7 +399,7 @@ func (b *BucketMap) getSome(offset, count int) ([]*Item, bool) {
 	}
 }
 
-func (b *BucketMap) erase(index uint32, item *Item) {
+func (b *BucketMap) Erase(index uint32, item *Item) {
 	b.rwLock_.Lock()
 	defer b.rwLock_.Unlock()
 
@@ -416,11 +416,11 @@ func (b *BucketMap) erase(index uint32, item *Item) {
 	b.freeList_.Push(int(index))
 }
 
-func (b *BucketMap) bucket(unixTime int64) uint32 {
+func (b *BucketMap) Bucket(unixTime int64) uint32 {
 	return bucketUtils.Bucket(unixTime, b.windowSize_, b.shardId_)
 }
 
-func (b *BucketMap) timestamp(bucket uint32) int64 {
+func (b *BucketMap) Timestamp(bucket uint32) int64 {
 	return bucketUtils.Timestamp(bucket, b.windowSize_, b.shardId_)
 }
 
@@ -428,16 +428,16 @@ func (b *BucketMap) duration(buckets uint32) uint64 {
 	return bucketUtils.Duration(buckets, b.windowSize_)
 }
 
-func (b *BucketMap) buckets(duration uint64) uint32 {
+func (b *BucketMap) Buckets(duration uint64) uint32 {
 	return bucketUtils.Buckets(duration, b.windowSize_)
 }
 
-func (b *BucketMap) getStorage() *bucketStorage.BucketStorage {
+func (b *BucketMap) GetStorage() *bucketStorage.BucketStorage {
 	return b.storage_
 }
 
-func (b *BucketMap) compactKeyList() {
-	items := b.getEverything()
+func (b *BucketMap) CompactKeyList() {
+	items := b.GetEverything()
 
 	b.keyWriter_.Compact(b.shardId_, func() persistentKeyList.KeyItem {
 		for i, item := range items {
@@ -450,9 +450,9 @@ func (b *BucketMap) compactKeyList() {
 	})
 }
 
-func (b *BucketMap) deleteOldBlockFiles() error {
+func (b *BucketMap) DeleteOldBlockFiles() error {
 	// Start far enough back that we can't possibly interfere with anything.
-	err := b.storage_.DeleteBucketOlderThan(b.bucket(time.Now().Unix()) - uint32(b.n_) - 1)
+	err := b.storage_.DeleteBucketOlderThan(b.Bucket(time.Now().Unix()) - uint32(b.n_) - 1)
 	if err != nil {
 		return err
 	}
@@ -460,10 +460,10 @@ func (b *BucketMap) deleteOldBlockFiles() error {
 }
 
 // Reads the key list. This function should be called after moving to PRE_OWNED state.
-func (b *BucketMap) readKeyList() error {
+func (b *BucketMap) ReadKeyList() error {
 	// Timer := timer.NewTimer(true)
 
-	if success := b.setState(READING_KEYS); !success {
+	if success := b.SetState(READING_KEYS); !success {
 		return fmt.Errorf("Setting state failed!")
 	}
 
@@ -513,8 +513,8 @@ func (b *BucketMap) readKeyList() error {
 		}
 	}
 
-	b.rowsFromDisk_ = b.getEverything()
-	if success := b.setState(READING_KEYS_DONE); !success {
+	b.rowsFromDisk_ = b.GetEverything()
+	if success := b.SetState(READING_KEYS_DONE); !success {
 		return fmt.Errorf("Setting state failed!")
 	}
 
@@ -523,7 +523,7 @@ func (b *BucketMap) readKeyList() error {
 
 // Sets the state. Returns true if state was set, false if the state
 // transition is not allowed or already in that state.
-func (b *BucketMap) setState(state int) bool {
+func (b *BucketMap) SetState(state int) bool {
 	if state < PRE_UNOWNED || state > OWNED {
 		return false
 	}
@@ -582,10 +582,9 @@ func isAllowedStateTransition(from, to int) bool {
 	return to > from || (from == OWNED && to == PRE_UNOWNED)
 }
 
-// Raads the data. The function should be called after calling
-// readKeyList.
-func (b *BucketMap) readData() (err error) {
-	if success := b.setState(READING_LOGS); !success {
+// Raads the data. The function should be called after calling readKeyList.
+func (b *BucketMap) ReadData() (err error) {
+	if success := b.SetState(READING_LOGS); !success {
 		return fmt.Errorf("Setting state failed!")
 	}
 
@@ -607,11 +606,11 @@ func (b *BucketMap) readData() (err error) {
 	b.mutex_.Unlock()
 
 	b.readLogFiles(b.lastFinalizedBucket_)
-	if b.getState() != READING_LOGS {
+	if b.GetState() != READING_LOGS {
 		return fmt.Errorf("Must be state: %s", stateString(READING_LOGS))
 	}
 
-	if success := b.setState(PROCESSING_QUEUED_DATA_POINTS); !success {
+	if success := b.SetState(PROCESSING_QUEUED_DATA_POINTS); !success {
 		return fmt.Errorf("Setting state failed!")
 	}
 
@@ -621,7 +620,7 @@ func (b *BucketMap) readData() (err error) {
 	// There's a tiny chance that incoming data points will think that
 	// the state is PROCESSING_QUEUED_DATA_POINTS and they will be
 	// queued after the second call to processQueuedDataPoints.
-	if success := b.setState(READING_BLOCK_DATA); !success {
+	if success := b.SetState(READING_BLOCK_DATA); !success {
 		return fmt.Errorf("Setting state failed!")
 	}
 
@@ -645,7 +644,7 @@ func (b *BucketMap) checkForMissingBlockFiles() {
 	}
 
 	if missingFiles > 0 {
-		now := b.bucket(time.Now().Unix())
+		now := b.Bucket(time.Now().Unix())
 		var errString string
 		errString = fmt.Sprintf("%d completed block files are missing. Got blocks:\n", missingFiles)
 		errString += fmt.Sprintln(b.unreadBlockFiles_)
@@ -661,14 +660,14 @@ func (b *BucketMap) checkForMissingBlockFiles() {
 func (b *BucketMap) readLogFiles(lastBlock uint32) error {
 	files := fileUtils.NewFileUtils(b.shardId_, dataTypes.LOG_FILE_PREFIX, b.dataDirectory_)
 	var unknownKeys uint32 = 0
-	lastTimestamp := b.timestamp(lastBlock + 1)
+	lastTimestamp := b.Timestamp(lastBlock + 1)
 
 	ids, err := files.Ls()
 	if err != nil {
 		return err
 	}
 	for _, id := range ids {
-		if int64(id) < b.timestamp(lastBlock+1) {
+		if int64(id) < b.Timestamp(lastBlock+1) {
 			// log.Printf("Skipping log file %d because it's already covered by a block", id)
 			continue
 		}
@@ -680,13 +679,13 @@ func (b *BucketMap) readLogFiles(lastBlock uint32) error {
 		}
 		defer file.File.Close()
 
-		bucketNum := b.bucket(int64(id))
+		bucketNum := b.Bucket(int64(id))
 
 		dataLog.ReadLog(&file, int64(id), func(index uint32, unixTime int64, value float64) bool {
 
-			if unixTime < b.timestamp(bucketNum) || unixTime > b.timestamp(bucketNum+1) {
+			if unixTime < b.Timestamp(bucketNum) || unixTime > b.Timestamp(bucketNum+1) {
 				log.Printf("Unix time is out of the expected range: %d [%d,%d]",
-					unixTime, b.timestamp(bucketNum), b.timestamp(bucketNum+1))
+					unixTime, b.Timestamp(bucketNum), b.Timestamp(bucketNum+1))
 
 				// It's better to stop reading this log file here because
 				// none of the data can be trusted after this.
@@ -700,13 +699,13 @@ func (b *BucketMap) readLogFiles(lastBlock uint32) error {
 				var dp dataTypes.DataPoint
 				dp.Timestamp = unixTime
 				dp.Value = value
-				b.rows_[index].s.Put(b.bucket(unixTime), index, dp, b.storage_, nil)
+				b.rows_[index].s.Put(b.Bucket(unixTime), index, dp, b.storage_, nil)
 			} else {
 				unknownKeys++
 			}
 
 			gap := unixTime - lastTimestamp
-			if gap > MISSING_LOGS_THRESHOLD_SECS && lastTimestamp > b.timestamp(1) {
+			if gap > MISSING_LOGS_THRESHOLD_SECS && lastTimestamp > b.Timestamp(1) {
 				// log.Printf("%d seconds of missing logs from %d to %d for shard %d",
 				// gap, lastTimestamp, unixTime, b.shardId_)
 				b.reliableDataStartTime_ = unixTime
@@ -722,7 +721,7 @@ func (b *BucketMap) readLogFiles(lastBlock uint32) error {
 
 	now := time.Now().Unix()
 	gap := now - lastTimestamp
-	if gap > MISSING_LOGS_THRESHOLD_SECS && lastTimestamp > b.timestamp(1) {
+	if gap > MISSING_LOGS_THRESHOLD_SECS && lastTimestamp > b.Timestamp(1) {
 		// log.Printf("%d seconds of missing logs from %d to now(%d) for shard %d",
 		// 	gap, lastTimestamp, now, b.shardId_)
 		b.reliableDataStartTime_ = now
@@ -730,7 +729,7 @@ func (b *BucketMap) readLogFiles(lastBlock uint32) error {
 	return nil
 }
 
-func (b *BucketMap) getState() int {
+func (b *BucketMap) GetState() int {
 	b.rwLock_.RLock()
 	defer b.rwLock_.RUnlock()
 	return b.state_
@@ -786,13 +785,13 @@ func (b *BucketMap) processQueueDataPoints(skipStateCheck bool) {
 // This function should be called repeatedly after calling readData.
 // Returns true if there might be more files to read, in which case the caller
 // should call again later.
-func (b *BucketMap) readBlockFiles() (bool, error) {
+func (b *BucketMap) ReadBlockFiles() (bool, error) {
 
 	b.mutex_.Lock()
 
 	l := len(b.unreadBlockFiles_)
 	if l == 0 {
-		if success := b.setState(OWNED); !success {
+		if success := b.SetState(OWNED); !success {
 			b.mutex_.Unlock()
 			return false, fmt.Errorf("Setting state failed!")
 		}
@@ -825,7 +824,7 @@ func (b *BucketMap) readBlockFiles() (bool, error) {
 // Cancels unowning. This should only be called if current state is
 // PRE_UNOWNED. Returns true if unowning was successful. State will
 // be OWNED after a successful call.
-func (b *BucketMap) cancelUnowning() bool {
+func (b *BucketMap) CancelUnowning() bool {
 	b.rwLock_.Lock()
 	defer b.rwLock_.Unlock()
 
@@ -840,9 +839,9 @@ func (b *BucketMap) cancelUnowning() bool {
 // Finalizes all the buckets which haven't been finalized up to the
 // given position. Returns the number of buckets that were finalized.
 // If the shard is not owned, will return immediately with 0.
-func (b *BucketMap) finalizeBuckets(lastBucketToFinalize uint32) (int, error) {
+func (b *BucketMap) FinalizeBuckets(lastBucketToFinalize uint32) (int, error) {
 
-	if b.getState() != OWNED {
+	if b.GetState() != OWNED {
 		return 0, nil
 	}
 
@@ -860,18 +859,18 @@ func (b *BucketMap) finalizeBuckets(lastBucketToFinalize uint32) (int, error) {
 	// There might be more than one bucket to finalize if the server was
 	// restarted or shards moved.
 	bucketsToFinalize := lastBucketToFinalize - bucketToFinalize + 1
-	items := b.getEverything()
+	items := b.GetEverything()
 	for bucket := bucketToFinalize; bucket <= lastBucketToFinalize; bucket++ {
 		for i, item := range items {
 			if item != nil {
 				// `i` is the id of the time series
 				if err := item.s.SetCurrentBucket(bucket+1, uint32(i),
-					b.getStorage()); err != nil {
+					b.GetStorage()); err != nil {
 					return int(bucket - bucketToFinalize), err
 				}
 			}
 		}
-		if err := b.getStorage().FinalizeBucket(bucket); err != nil {
+		if err := b.GetStorage().FinalizeBucket(bucket); err != nil {
 			return int(bucket - bucketToFinalize), err
 		}
 	}
@@ -881,18 +880,18 @@ func (b *BucketMap) finalizeBuckets(lastBucketToFinalize uint32) (int, error) {
 }
 
 // Returns whether this BucketMap is behind more than 1 bucket.
-func (b *BucketMap) isBehind(bucketToFinalize uint32) bool {
-	return b.getState() == OWNED && b.lastFinalizedBucket_ != 0 &&
+func (b *BucketMap) IsBehind(bucketToFinalize uint32) bool {
+	return b.GetState() == OWNED && b.lastFinalizedBucket_ != 0 &&
 		bucketToFinalize > b.lastFinalizedBucket_+1
 }
 
-func (b *BucketMap) getLastFinalizedBucket() uint32 {
+func (b *BucketMap) GetLastFinalizedBucket() uint32 {
 	return b.lastFinalizedBucket_
 }
 
 // Returns the earliest timestamp (inclusive) from which is
 // unaware of any missing data.  Initialized to 0 and returns 0
 // if a shard has no missing data
-func (b *BucketMap) getReliableDataStartTime() int64 {
+func (b *BucketMap) GetReliableDataStartTime() int64 {
 	return b.reliableDataStartTime_
 }
