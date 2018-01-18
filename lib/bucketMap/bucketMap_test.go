@@ -22,6 +22,11 @@ var (
 	testString    = make([]string, NUM_OF_KEYS)
 )
 
+type DataPoint struct {
+	key   string
+	value dataTypes.DataPoint
+}
+
 func createString() {
 	for i := range testString {
 		testString[i] = testUtil.RandStr(10)
@@ -65,11 +70,11 @@ func testMap(m *BucketMap, t *testing.T) {
 
 func testReads(m *BucketMap, t *testing.T) {
 	for i := 0; i < NUM_OF_KEYS; i++ {
-		row := m.Get(testString[i])
+		row := m.GetItem(testString[i])
 		if row == nil {
-			t.Fatal("the result of Get() is nil!")
+			t.Fatal("the result of GetItem() is nil!")
 		}
-		out, err := row.s.Get(0, 0, m.GetStorage())
+		out, err := row.S.Get(0, 0, m.GetStorage())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -185,7 +190,7 @@ func TestReload(t *testing.T) {
 	if have != 2 {
 		t.Fatal("the number of keys is wrong")
 	}
-	out, err := m3.Get("another key").s.Get(0, uint32(m3.Timestamp(3)), m3.GetStorage())
+	out, err := m3.GetItem("another key").S.Get(0, uint32(m3.Timestamp(3)), m3.GetStorage())
 	if len(out) != 1 {
 		t.Fatal("length of output is wrong")
 	}
@@ -259,11 +264,11 @@ func TestPut(t *testing.T) {
 		t.Fatal("Wrong result of Put() when state is OWNED")
 	}
 
-	if m2.Get("test string 1") != nil {
+	if m2.GetItem("test string 1") != nil {
 		t.Fatal("Wrong result with 'test string 1'!")
 	}
 
-	if out, err := m2.Get("test string 2").s.Get(0, uint32(m2.Timestamp(3)),
+	if out, err := m2.GetItem("test string 2").S.Get(0, uint32(m2.Timestamp(3)),
 		m2.GetStorage()); len(out) != 1 || err != nil {
 		t.Fatal("Wrong result with 'test string 2'!")
 	}
@@ -278,4 +283,40 @@ func TestPut(t *testing.T) {
 	if items, more := m2.GetSome(len(m2.rows_)-10, 4); len(items) != 4 || more != true {
 		t.Fatal("Wrong result for GetSome()!")
 	}
+}
+
+func TestPutAndGet(t *testing.T) {
+	var shardId int64 = 10
+	testUtil.PathCreate(shardId)
+	// defer testUtil.FileDelete()
+
+	k := keyListWriter.NewKeyListWriter(dataDirectory, 100)
+	b := bucketLogWriter.NewBucketLogWriter(4*timeConstants.SECONDS_PER_HOUR, dataDirectory, 100, 0)
+	k.StartShard(shardId)
+	b.StartShard(shardId)
+
+	// Fill, then close the BucketMap.
+	m := NewBucketMap(6, 4*timeConstants.SECONDS_PER_HOUR, shardId, dataDirectory, k, b, OWNED)
+
+	testDatas := []DataPoint{
+		{key: "testa", value: dataTypes.DataPoint{Value: 100.0, Timestamp: 60}},
+		{key: "testa", value: dataTypes.DataPoint{Value: 110.0, Timestamp: 118}},
+		{key: "testa", value: dataTypes.DataPoint{Value: 170.0, Timestamp: 183}},
+		{key: "testa", value: dataTypes.DataPoint{Value: 210.0, Timestamp: 247}},
+		{key: "testa", value: dataTypes.DataPoint{Value: 110.0, Timestamp: 300}},
+	}
+
+	for _, testData := range testDatas {
+		_, _, err := m.Put(testData.key, testData.value, 0, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	res, err := m.Get("testa", 60, 280)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fmt.Println(res)
 }

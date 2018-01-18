@@ -15,6 +15,7 @@ import (
 	"github.com/huangaz/tsdb/lib/fileUtils"
 	"github.com/huangaz/tsdb/lib/keyListWriter"
 	"github.com/huangaz/tsdb/lib/persistentKeyList"
+	"github.com/huangaz/tsdb/lib/timeSeriesStream"
 	"github.com/huangaz/tsdb/lib/timer"
 	"github.com/huangaz/tsdb/lib/utils/priorityQueue"
 	"log"
@@ -132,8 +133,8 @@ type QueueDataPoint struct {
 }
 
 type Item struct {
-	key string
-	s   *bucketedTimeSeries.BucketedTimeSeries
+	Key string
+	S   *bucketedTimeSeries.BucketedTimeSeries
 }
 
 func NewBucketMap(buckets uint8, windowSize uint64, shardId int64, dataDirectory string,
@@ -162,8 +163,8 @@ func NewBucketMap(buckets uint8, windowSize uint64, shardId int64, dataDirectory
 
 func NewItem(key string) *Item {
 	res := &Item{
-		key: key,
-		s:   bucketedTimeSeries.NewBucketedTimeSeries(),
+		Key: key,
+		S:   bucketedTimeSeries.NewBucketedTimeSeries(),
 	}
 	return res
 }
@@ -174,6 +175,10 @@ func NewItem(key string) *Item {
 // Returns {kNotOwned,kNotOwned} if this map is currenly not owned.
 func (b *BucketMap) Put(key string, value dataTypes.DataPoint, category uint16,
 	skipStateCheck bool) (newRows, dataPoints int, err error) {
+
+	if key == "" {
+		return 0, 0, fmt.Errorf("null key!")
+	}
 
 	state := b.GetState()
 	existingItem, id := b.getInternal(key)
@@ -222,7 +227,7 @@ func (b *BucketMap) Put(key string, value dataTypes.DataPoint, category uint16,
 
 	if existingItem != nil {
 		// Directly put the data point to the timeSeries instead of queueing it.
-		if added := b.putDataPointWithId(existingItem.s, id, value, category); added {
+		if added := b.putDataPointWithId(existingItem.S, id, value, category); added {
 			return 0, 1, nil
 		} else {
 			return 0, 0, nil
@@ -233,8 +238,8 @@ func (b *BucketMap) Put(key string, value dataTypes.DataPoint, category uint16,
 
 	// Prepare a row now to minimize critical section.
 	newRow := NewItem(key)
-	newRow.s.Reset(b.n_)
-	newRow.s.Put(bucketNum, 0, value, b.storage_, &category)
+	newRow.S.Reset(b.n_)
+	newRow.S.Put(bucketNum, 0, value, b.storage_, &category)
 
 	var index int = 0
 
@@ -244,7 +249,7 @@ func (b *BucketMap) Put(key string, value dataTypes.DataPoint, category uint16,
 
 	// Nothing was inserted, just update the existing one.
 	if timeSeriesId, ok := b.map_[key]; ok {
-		if added := b.putDataPointWithId(b.rows_[timeSeriesId].s, timeSeriesId, value,
+		if added := b.putDataPointWithId(b.rows_[timeSeriesId].S, timeSeriesId, value,
 			category); added {
 			return 0, 1, nil
 		} else {
@@ -367,9 +372,32 @@ func (b *BucketMap) queueDataPoint(dp QueueDataPoint) {
 }
 
 // Get a ptr of a timeSeries.
-func (b *BucketMap) Get(key string) *Item {
+func (b *BucketMap) GetItem(key string) *Item {
 	item, _ := b.getInternal(key)
 	return item
+}
+
+func (b *BucketMap) Get(key string, begin, end int64) (res []dataTypes.DataPoint, err error) {
+
+	item := b.GetItem(key)
+	if item == nil {
+		return nil, fmt.Errorf("key missing!")
+	}
+
+	blocks, err := item.S.Get(b.Bucket(begin), b.Bucket(end), b.GetStorage())
+	if err != nil {
+		return nil, err
+	}
+
+	for _, block := range blocks {
+		out, err := timeSeriesStream.ReadValues(block.Data, begin, end, int(block.Count))
+		if err != nil {
+			return res, err
+		}
+		res = append(res, out...)
+	}
+	return res, nil
+
 }
 
 // Get all the TimeSeries.
@@ -407,9 +435,9 @@ func (b *BucketMap) Erase(index uint32, item *Item) {
 		return
 	}
 
-	id, ok := b.map_[item.key]
+	id, ok := b.map_[item.Key]
 	if ok && id == index {
-		delete(b.map_, item.key)
+		delete(b.map_, item.Key)
 	}
 
 	b.rows_[index] = nil
@@ -442,7 +470,7 @@ func (b *BucketMap) CompactKeyList() {
 	b.keyWriter_.Compact(b.shardId_, func() persistentKeyList.KeyItem {
 		for i, item := range items {
 			if item != nil {
-				keyItem := persistentKeyList.KeyItem{int32(i), item.key, item.s.GetCategory()}
+				keyItem := persistentKeyList.KeyItem{int32(i), item.Key, item.S.GetCategory()}
 				return keyItem
 			}
 		}
@@ -489,8 +517,8 @@ func (b *BucketMap) ReadKeyList() error {
 		}
 
 		newItem := NewItem(item.Key)
-		newItem.s.Reset(b.n_)
-		newItem.s.SetCategory(item.Category)
+		newItem.S.Reset(b.n_)
+		newItem.S.SetCategory(item.Category)
 		b.rows_[item.Id] = newItem
 
 		return true
@@ -501,12 +529,12 @@ func (b *BucketMap) ReadKeyList() error {
 	// Put all the rows in either the map or the free list.
 	for i, it := range b.rows_ {
 		if it != nil {
-			if _, ok := b.map_[it.key]; ok {
+			if _, ok := b.map_[it.Key]; ok {
 				// Ignore keys that already exist.
 				b.rows_[i] = nil
 				b.freeList_.Push(i)
 			} else {
-				b.map_[it.key] = uint32(i)
+				b.map_[it.Key] = uint32(i)
 			}
 		} else {
 			b.freeList_.Push(i)
@@ -699,7 +727,7 @@ func (b *BucketMap) readLogFiles(lastBlock uint32) error {
 				var dp dataTypes.DataPoint
 				dp.Timestamp = unixTime
 				dp.Value = value
-				b.rows_[index].s.Put(b.Bucket(unixTime), index, dp, b.storage_, nil)
+				b.rows_[index].S.Put(b.Bucket(unixTime), index, dp, b.storage_, nil)
 			} else {
 				unknownKeys++
 			}
@@ -773,7 +801,7 @@ func (b *BucketMap) processQueueDataPoints(skipStateCheck bool) {
 			if !skipStateCheck && state != OWNED && state != PRE_UNOWNED {
 				continue
 			}
-			b.putDataPointWithId(item.s, dp.timeSeriesId, value, dp.category)
+			b.putDataPointWithId(item.S, dp.timeSeriesId, value, dp.category)
 		} else {
 			// Run these through the normal workflow.
 			b.Put(dp.key, value, dp.category, skipStateCheck)
@@ -813,7 +841,7 @@ func (b *BucketMap) ReadBlockFiles() (bool, error) {
 	for i, id := range timeSeriesIds {
 		b.rwLock_.RLock()
 		if id < uint32(len(b.rowsFromDisk_)) && b.rowsFromDisk_[id] != nil {
-			b.rows_[id].s.SetDataBlock(position, b.n_, storageIds[i])
+			b.rows_[id].S.SetDataBlock(position, b.n_, storageIds[i])
 		}
 		b.rwLock_.RUnlock()
 	}
@@ -864,7 +892,7 @@ func (b *BucketMap) FinalizeBuckets(lastBucketToFinalize uint32) (int, error) {
 		for i, item := range items {
 			if item != nil {
 				// `i` is the id of the time series
-				if err := item.s.SetCurrentBucket(bucket+1, uint32(i),
+				if err := item.S.SetCurrentBucket(bucket+1, uint32(i),
 					b.GetStorage()); err != nil {
 					return int(bucket - bucketToFinalize), err
 				}
