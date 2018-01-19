@@ -923,3 +923,7 @@ func (b *BucketMap) GetLastFinalizedBucket() uint32 {
 func (b *BucketMap) GetReliableDataStartTime() int64 {
 	return b.reliableDataStartTime_
 }
+
+func (b *BucketMap) GetShardId() int64 {
+	return b.shardId_
+}

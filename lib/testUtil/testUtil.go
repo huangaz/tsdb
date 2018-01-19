@@ -2,11 +2,12 @@ package testUtil
 
 import (
 	"fmt"
-	"github.com/huangaz/tsdb/lib/dataTypes"
 	"math/rand"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/huangaz/tsdb/lib/dataTypes"
 )
 
 const (
@@ -73,14 +74,8 @@ func SingleFileCreate(path string, unixTime int64) {
 	os.Create(logFile)
 }
 
-func PathCreate(shardId int64) string {
-	ShardDirectory := DataDirectory_Test + "/" + strconv.Itoa(int(shardId))
-	err := os.MkdirAll(ShardDirectory, 0777)
-	if err != nil {
-		fmt.Println(err)
-		return ""
-	}
-	return ShardDirectory
+func PathCreate(shardId int64) error {
+	return os.MkdirAll(fmt.Sprintf("%s/%d", DataDirectory_Test, shardId), 0755)
 }
 
 func FileDelete() {
@@ -134,4 +129,28 @@ func RandStr(length int) string {
 	}
 
 	return string(res)
+}
+
+func DataGenerator(numOfKeys, num int) *dataTypes.PutRequest {
+	req := &dataTypes.PutRequest{}
+	req.Datas = make([]*dataTypes.Data, num*numOfKeys)
+	index := 0
+
+	for i := 0; i < numOfKeys; i++ {
+		testKey := RandStr(10)
+		testTime := 0
+
+		for j := 0; j < num; j++ {
+			testTime += (55 + rand.Intn(10))
+			newData := &dataTypes.Data{
+				Key:     testKey,
+				ShardId: int64(i + 1),
+				DataPoint: dataTypes.DataPoint{Timestamp: int64(testTime),
+					Value: float64(100 + rand.Intn(50))},
+			}
+			req.Datas[index] = newData
+			index++
+		}
+	}
+	return req
 }

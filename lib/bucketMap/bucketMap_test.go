@@ -199,7 +199,7 @@ func TestReload(t *testing.T) {
 func TestPut(t *testing.T) {
 	var shardId int64 = 10
 	testUtil.PathCreate(shardId)
-	defer testUtil.FileDelete()
+	// defer testUtil.FileDelete()
 
 	k := keyListWriter.NewKeyListWriter(dataDirectory, 100)
 	b := bucketLogWriter.NewBucketLogWriter(4*timeConstants.SECONDS_PER_HOUR, dataDirectory, 100, 0)
@@ -285,6 +285,7 @@ func TestPut(t *testing.T) {
 	}
 }
 
+/*
 func TestPutAndGet(t *testing.T) {
 	var shardId int64 = 10
 	testUtil.PathCreate(shardId)
@@ -313,6 +314,12 @@ func TestPutAndGet(t *testing.T) {
 		}
 	}
 
+	_, err := m.FinalizeBuckets(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Second)
+
 	res, err := m.Get("testa", 60, 280)
 	if err != nil {
 		t.Fatal(err)
@@ -320,3 +327,4 @@ func TestPutAndGet(t *testing.T) {
 
 	fmt.Println(res)
 }
+*/

@@ -1,9 +1,5 @@
 package bucketUtils
 
-import (
-	"log"
-)
-
 const (
 	// Number of maps for gorilla to use
 	GORILLA_SHARDS = 100
@@ -12,7 +8,7 @@ const (
 // Conversions from timestamp to bucket number.
 func Bucket(unixTime int64, windowSize uint64, shardId int64) uint32 {
 	if unixTime < shardId*int64(windowSize)/GORILLA_SHARDS {
-		log.Printf("Timestamp %d falls into a negative bucket!", unixTime)
+		// log.Printf("Timestamp %d falls into a negative bucket!", unixTime)
 		return 0
 	}
 	return uint32((unixTime - (shardId * int64(windowSize) / GORILLA_SHARDS)) / int64(windowSize))
