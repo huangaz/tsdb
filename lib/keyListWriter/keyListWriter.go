@@ -2,9 +2,10 @@ package keyListWriter
 
 import (
 	"fmt"
-	"github.com/huangaz/tsdb/lib/persistentKeyList"
 	"log"
 	"sync"
+
+	"github.com/huangaz/tsdb/lib/persistentKeyList"
 )
 
 // keyType

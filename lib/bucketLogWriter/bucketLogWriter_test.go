@@ -2,13 +2,14 @@ package bucketLogWriter
 
 import (
 	"fmt"
+	"reflect"
+	"testing"
+	"time"
+
 	"github.com/huangaz/tsdb/lib/bucketUtils"
 	"github.com/huangaz/tsdb/lib/dataLog"
 	"github.com/huangaz/tsdb/lib/fileUtils"
 	"github.com/huangaz/tsdb/lib/testUtil"
-	"reflect"
-	"testing"
-	"time"
 )
 
 var (
@@ -22,8 +23,10 @@ func TestWriteSingleValue(t *testing.T) {
 	var windowSize uint64 = 100
 	var unixTime int64 = 6480
 
-	path := testUtil.PathCreate(shardId)
-	testUtil.SingleFileCreate(path, unixTime)
+	testUtil.PathCreate(shardId)
+
+	// path := testUtil.PathCreate(shardId)
+	// testUtil.SingleFileCreate(path, unixTime)
 	defer testUtil.FileDelete()
 
 	fileUtil := fileUtils.NewFileUtils(shardId, logPrefix, dataDirectory)

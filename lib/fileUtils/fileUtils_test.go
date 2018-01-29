@@ -1,9 +1,10 @@
 package fileUtils
 
 import (
-	"github.com/huangaz/tsdb/lib/testUtil"
 	"os"
 	"testing"
+
+	"github.com/huangaz/tsdb/lib/testUtil"
 )
 
 var (

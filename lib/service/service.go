@@ -22,6 +22,10 @@ var (
 	dataDirectory = testUtil.DataDirectory_Test
 )
 
+func NewService() *TsdbService {
+
+}
+
 func (t *TsdbService) Start() (err error) {
 	// config adapter not done
 	t.ids = make([]int64, 1)

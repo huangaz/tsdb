@@ -7,12 +7,12 @@ package bucketStorage
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
+	"sync"
+
 	"github.com/huangaz/tsdb/lib/dataBlockReader"
 	"github.com/huangaz/tsdb/lib/dataTypes"
 	"github.com/huangaz/tsdb/lib/fileUtils"
-	"sync"
 )
 
 const (
@@ -22,13 +22,6 @@ const (
 	// Store data in 64K chunks.
 	PAGE_SIZE uint32 = dataTypes.DATA_BLOCK_SIZE
 
-	DATA_PREFIX = dataTypes.DATA_PRE_FIX
-
-	// These files are only used as marker files to indicate which
-	// blocks have been completed. The files are empty but the file name
-	// has the id of the completed block.
-	COMPLETE_PREFIX = dataTypes.COMPLETE_PREFIX
-
 	// To fit in 15 bits.
 	MAX_ITEM_COUNT  = 32767
 	MAX_DATA_LENGTH = 32767
@@ -37,6 +30,15 @@ const (
 	MAX_PAGE_COUNT = 262144
 
 	LARGE_FILE_BUFFER = 1024 * 1024
+)
+
+var (
+	dataPrefix = dataTypes.DATA_PRE_FIX
+
+	// These files are only used as marker files to indicate which
+	// blocks have been completed. The files are empty but the file name
+	// has the id of the completed block.
+	completePrefix = dataTypes.COMPLETE_PREFIX
 )
 
 type BucketStorage struct {
@@ -57,13 +59,16 @@ type BucketData struct {
 	finalized         bool
 
 	// Two separate vectors for metadata to save memory.
-	timeSeriesIds       []uint32
-	storageIds          []uint64
-	storageIdsLookupMap map[uint64]([]uint64)
+	timeSeriesIds []uint32
+	storageIds    []uint64
+	// storageIdsLookupMap map[uint64]([]uint64)
 
 	// To control that reads will always work, i.e., allocated pages
 	// won't be deleted.
 	fetchLock sync.RWMutex
+
+	// To control modifying pages vector and the other data in this struct.
+	pagesMutex sync.Mutex
 }
 
 // Return a new BucketData.
@@ -80,14 +85,12 @@ func NewBucketData() *BucketData {
 
 // Return a new BucketStorage with the given bucket number, shardId and dataDirectory.
 func NewBueketStorage(numBuckets uint8, shardId int64, dataDirectory string) *BucketStorage {
-	data_prefix := DATA_PREFIX
-	complete_prefix := COMPLETE_PREFIX
 	res := &BucketStorage{
 		numbuckets_:      numBuckets,
 		newestPosition_:  0,
 		dataBlockReader_: dataBlockReader.NewDataBlockReader(shardId, dataDirectory),
-		dataFiles_:       fileUtils.NewFileUtils(shardId, data_prefix, dataDirectory),
-		completeFiles_:   fileUtils.NewFileUtils(shardId, complete_prefix, dataDirectory),
+		dataFiles_:       fileUtils.NewFileUtils(shardId, dataPrefix, dataDirectory),
+		completeFiles_:   fileUtils.NewFileUtils(shardId, completePrefix, dataDirectory),
 	}
 
 	res.data_ = make([]*BucketData, numBuckets)
@@ -103,13 +106,13 @@ func NewBueketStorage(numBuckets uint8, shardId int64, dataDirectory string) *Bu
 func (b *BucketStorage) Enable() {
 	ptr := b.data_[:]
 	for i := uint8(0); i < b.numbuckets_; i++ {
-		ptr[i].fetchLock.Lock()
+		ptr[i].pagesMutex.Lock()
 
 		ptr[i].disabled = false
 		ptr[i].activePages = 0
 		ptr[i].lastPageBytesUsed = 0
 
-		ptr[i].fetchLock.Unlock()
+		ptr[i].pagesMutex.Unlock()
 	}
 }
 
@@ -120,33 +123,29 @@ func (b *BucketStorage) Enable() {
 // `itemCount` is the numbers of data points in data[].
 //
 // Returns an id that can be used to fetch data later, or kInvalidId if data
-// could not be stored. This can happen if data is tried to be stored for
-// a position that is too old, i.e., more than numBuckets behind the current
-// position.
+// could not be stored. This can happen if data is tried to be stored for a
+// position that is too old, i.e., more than numBuckets behind the current position.
 
 func (b *BucketStorage) Store(position uint32, data []byte, itemCount uint16,
-	timeSeriesId uint32) (id uint64, err error) {
+	timeSeriesId uint32) (storageId uint64, err error) {
 
 	dataLength := uint16(len(data))
 	// insert too much data
 	if dataLength > MAX_DATA_LENGTH || itemCount > MAX_ITEM_COUNT {
-		errString := fmt.Sprintf("Attempted to insert too much data. Length : %d Count : %d",
+		return INVALID_ID, fmt.Errorf("Attempted to insert too much data. Length : %d Count : %d",
 			dataLength, itemCount)
-		err = errors.New(errString)
-		return INVALID_ID, err
 	}
 
 	var pageIndex, pageOffset uint32
 	bucket := uint8(position % uint32(b.numbuckets_))
 	ptr := b.data_[:]
 
-	ptr[bucket].fetchLock.Lock()
-	defer ptr[bucket].fetchLock.Unlock()
+	ptr[bucket].pagesMutex.Lock()
+	defer ptr[bucket].pagesMutex.Unlock()
 
 	// data is disabled
 	if ptr[bucket].disabled == true {
-		err = errors.New("Data is disabled!")
-		return INVALID_ID, err
+		return INVALID_ID, fmt.Errorf("Data is disabled!")
 	}
 
 	// Check if this is the first time this position is seen. If it is,
@@ -163,44 +162,44 @@ func (b *BucketStorage) Store(position uint32, data []byte, itemCount uint16,
 		ptr[bucket].storageIds = ptr[bucket].storageIds[:0]
 		ptr[bucket].timeSeriesIds = ptr[bucket].timeSeriesIds[:0]
 		ptr[bucket].finalized = false
-		ptr[bucket].storageIdsLookupMap = make(map[uint64]([]uint64))
+		// ptr[bucket].storageIdsLookupMap = make(map[uint64]([]uint64))
 		b.newestPosition_ = position
 	}
 
 	if ptr[bucket].position != position {
-		err = errors.New("Trying to write data to an expired bucket")
-		return INVALID_ID, err
+		return INVALID_ID, fmt.Errorf("Trying to write data to an expired bucket!")
 	}
 
 	if ptr[bucket].finalized == true {
-		err = errors.New("Trying to write data to a finalized bucket")
-		return INVALID_ID, err
+		return INVALID_ID, fmt.Errorf("Trying to write data to a finalized bucket!")
 	}
 
-	id = INVALID_ID
-	// hash not done yet
-	var hash uint64 = 1
-	s := ptr[bucket].storageIdsLookupMap[hash]
-	for _, idInMap := range s {
-		index, offset, length, count := b.parseId(idInMap)
-		tmpdata := ptr[bucket].pages[index].Data[offset : offset+uint32(dataLength)]
-		// already have this data
-		if length == dataLength && count == itemCount && bytes.Compare(data, tmpdata) == 0 {
-			// timeseries block dedup size
-			id = idInMap
-			break
+	storageId = INVALID_ID
+
+	/*
+		// hash not done yet
+		var hash uint64 = 1
+		s := ptr[bucket].storageIdsLookupMap[hash]
+		for _, idInMap := range s {
+			index, offset, length, count := b.parseId(idInMap)
+			tmpdata := ptr[bucket].pages[index].Data[offset : offset+uint32(dataLength)]
+			// already have this data
+			if length == dataLength && count == itemCount && bytes.Compare(data, tmpdata) == 0 {
+				// timeseries block dedup size
+				storageId = idInMap
+				break
+			}
 		}
-	}
+	*/
 
 	// New data.
-	if id == INVALID_ID {
+	if storageId == INVALID_ID {
 		if ptr[bucket].activePages == 0 || ptr[bucket].lastPageBytesUsed+uint32(dataLength) >
 			PAGE_SIZE {
 			// All allocated pages used, need to allocate more pages.
 			if ptr[bucket].activePages == uint32(len(ptr[bucket].pages)) {
 				if uint32(len(ptr[bucket].pages)) == MAX_PAGE_COUNT {
-					err = errors.New("All pages are already in use.")
-					return INVALID_ID, err
+					return INVALID_ID, fmt.Errorf("All pages are already in use!")
 				}
 				// Create a new DataBlock.
 				newDataBlock := new(dataTypes.DataBlock)
@@ -224,74 +223,70 @@ func (b *BucketStorage) Store(position uint32, data []byte, itemCount uint16,
 			return INVALID_ID, err
 		}
 
-		id = b.createId(pageIndex, pageOffset, dataLength, itemCount)
-		ptr[bucket].storageIdsLookupMap[hash] = append(ptr[bucket].storageIdsLookupMap[hash], id)
+		storageId = b.createId(pageIndex, pageOffset, dataLength, itemCount)
+		// ptr[bucket].storageIdsLookupMap[hash] = append(ptr[bucket].storageIdsLookupMap[hash], storageId)
 	}
 
 	ptr[bucket].timeSeriesIds = append(ptr[bucket].timeSeriesIds, timeSeriesId)
-	ptr[bucket].storageIds = append(ptr[bucket].storageIds, id)
-	return id, nil
+	ptr[bucket].storageIds = append(ptr[bucket].storageIds, storageId)
+	return storageId, nil
 }
 
-// Parse Id to get pageIndex, pageOffset, dataLength and itemCount.
-func (b *BucketStorage) parseId(id uint64) (pageIndex, pageOffset uint32, dataLength, itemCount uint16) {
-	pageIndex = uint32(id >> 46)
+// Parse storageId to get pageIndex, pageOffset, dataLength and itemCount.
+func (b *BucketStorage) parseId(storageId uint64) (pageIndex, pageOffset uint32, dataLength, itemCount uint16) {
+	pageIndex = uint32(storageId >> 46)
 
-	pageOffset = uint32((id >> 30)) & (PAGE_SIZE - 1)
+	pageOffset = uint32((storageId >> 30)) & (PAGE_SIZE - 1)
 
-	dataLength = uint16((id >> 15) & MAX_DATA_LENGTH)
+	dataLength = uint16((storageId >> 15) & MAX_DATA_LENGTH)
 
-	itemCount = uint16(id & MAX_ITEM_COUNT)
+	itemCount = uint16(storageId & MAX_ITEM_COUNT)
 
 	return
 }
 
-// Use pageIndex, pageOffset, dataLength, itemCount to create an Id
+// Use pageIndex, pageOffset, dataLength, itemCount to create a storageId
 // Store all the values in 64 bits
-func (b *BucketStorage) createId(pageIndex, pageOffset uint32, dataLength, itemCount uint16) (id uint64) {
+func (b *BucketStorage) createId(pageIndex, pageOffset uint32, dataLength, itemCount uint16) (storageId uint64) {
 	// Using the first 18 bits.
-	id += uint64(pageIndex) << 46
+	storageId += uint64(pageIndex) << 46
 
 	// The next 16 bits.
-	id += uint64(pageOffset) << 30
+	storageId += uint64(pageOffset) << 30
 
 	// The next 15 bits.
-	id += uint64(dataLength) << 15
+	storageId += uint64(dataLength) << 15
 
 	// The last 15 bits.
-	id += uint64(itemCount)
+	storageId += uint64(itemCount)
 
 	return
 }
 
-// Fetches data with given position and id.
+// Fetches data with given position and storageId.
 // Return `data[]` and `itemCount`
-func (b *BucketStorage) Fetch(position uint32, id uint64) (data []byte, itemCount uint16, err error) {
-	if id == INVALID_ID {
-		err = errors.New("Invalid ID!")
-		return nil, 0, err
+func (b *BucketStorage) Fetch(position uint32, storageId uint64) (data []byte, itemCount uint16, err error) {
+	if storageId == INVALID_ID {
+		return nil, 0, fmt.Errorf("Invalid StorageId!")
 	}
 
-	pageIndex, pageOffset, dataLength, itemCount := b.parseId(id)
+	pageIndex, pageOffset, dataLength, itemCount := b.parseId(storageId)
 	bucket := uint8(position % uint32(b.numbuckets_))
 	ptr := b.data_[:]
 
 	if pageOffset+uint32(dataLength) > PAGE_SIZE {
-		err = errors.New("Corrupt ID!")
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("Corrupt StorageId!")
 	}
 
 	ptr[bucket].fetchLock.RLock()
 	defer ptr[bucket].fetchLock.RUnlock()
 
 	if ptr[bucket].disabled == true {
-		err = errors.New("Data is disabled!")
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("Data is disabled!")
 	}
 
 	if ptr[bucket].position != position && ptr[bucket].position != 0 {
-		err = errors.New("Tried to fetch data for an expired bucket.")
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("Tried to fetch data for an expired bucket!")
 	}
 
 	if pageIndex < uint32(len(ptr[bucket].pages)) && ptr[bucket].pages[pageIndex] != nil {
@@ -304,8 +299,7 @@ func (b *BucketStorage) Fetch(position uint32, id uint64) (data []byte, itemCoun
 		return data, itemCount, nil
 	}
 
-	err = errors.New("error!")
-	return nil, 0, err
+	return nil, 0, fmt.Errorf("Error!")
 }
 
 // Read all blocks for a given position into memory from disk.
@@ -326,9 +320,8 @@ func (b *BucketStorage) LoadPosition(position uint32) (timeSeriesIds []uint32,
 	// Ignore buckets that have been completely read from disk or are
 	// being actively filled by store().
 	if ptr[bucket].activePages != 0 {
-		err = errors.New("Bucket have been completely read or are being filled!")
 		ptr[bucket].fetchLock.Unlock()
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("Bucket have been completely read or are being filled!")
 	}
 	ptr[bucket].fetchLock.Unlock()
 
@@ -339,8 +332,7 @@ func (b *BucketStorage) LoadPosition(position uint32) (timeSeriesIds []uint32,
 
 	blocksSize := len(blocks)
 	if blocksSize == 0 {
-		err = errors.New("Block file read failures!")
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("Block file read failures!")
 	}
 
 	ptr[bucket].fetchLock.Lock()
@@ -361,7 +353,7 @@ func (b *BucketStorage) LoadPosition(position uint32) (timeSeriesIds []uint32,
 func (b *BucketStorage) sanityCheck(bucket uint8, position uint32) (err error) {
 	ptr := b.data_[:]
 	if ptr[bucket].disabled == true {
-		return errors.New("Tried to fetch bucket for disabled shard.")
+		return fmt.Errorf("Tried to fetch bucket for disabled shard.")
 	}
 
 	if ptr[bucket].position != position {
@@ -370,7 +362,7 @@ func (b *BucketStorage) sanityCheck(bucket uint8, position uint32) (err error) {
 			// position.
 			ptr[bucket].position = position
 		} else {
-			return errors.New("Tried to fetch expired bucket.")
+			return fmt.Errorf("Tried to fetch expired bucket.")
 		}
 	}
 	return nil
@@ -380,7 +372,7 @@ func (b *BucketStorage) sanityCheck(bucket uint8, position uint32) (err error) {
 func (b *BucketStorage) ClearAndDisable() {
 	ptr := b.data_[:]
 	for i := uint8(0); i < b.numbuckets_; i++ {
-		ptr[i].fetchLock.Lock()
+		ptr[i].pagesMutex.Lock()
 
 		ptr[i].disabled = true
 
@@ -388,10 +380,10 @@ func (b *BucketStorage) ClearAndDisable() {
 		ptr[i].pages = ptr[i].pages[:0]
 		ptr[i].activePages = 0
 		ptr[i].lastPageBytesUsed = 0
-		ptr[i].storageIdsLookupMap = make(map[uint64]([]uint64))
+		// ptr[i].storageIdsLookupMap = make(map[uint64]([]uint64))
 		ptr[i].finalized = false
 
-		ptr[i].fetchLock.Unlock()
+		ptr[i].pagesMutex.Unlock()
 	}
 }
 
@@ -406,20 +398,22 @@ func (b *BucketStorage) FinalizeBucket(position uint32) (err error) {
 	bucket := uint8(position % uint32(b.numbuckets_))
 	ptr := b.data_[:]
 
-	ptr[bucket].fetchLock.Lock()
-	defer ptr[bucket].fetchLock.Unlock()
+	ptr[bucket].pagesMutex.Lock()
 
 	if ptr[bucket].disabled == true {
-		return errors.New("Trying to finalize a disabled bucket")
+		ptr[bucket].pagesMutex.Unlock()
+		return fmt.Errorf("Trying to finalize a disabled bucket")
 	}
 
 	if ptr[bucket].position != position {
-		return errors.New("Trying to finalize an expired bucket")
+		ptr[bucket].pagesMutex.Unlock()
+		return fmt.Errorf("Trying to finalize an expired bucket")
 	}
 
 	if ptr[bucket].finalized == true {
+		ptr[bucket].pagesMutex.Unlock()
 		errString := fmt.Sprintf("This bucket has already been finalized: %d", position)
-		return errors.New(errString)
+		return fmt.Errorf(errString)
 	}
 
 	pages := ptr[bucket].pages
@@ -429,8 +423,10 @@ func (b *BucketStorage) FinalizeBucket(position uint32) (err error) {
 
 	ptr[bucket].timeSeriesIds = ptr[bucket].timeSeriesIds[:0]
 	ptr[bucket].storageIds = ptr[bucket].storageIds[:0]
-	ptr[bucket].storageIdsLookupMap = make(map[uint64]([]uint64))
+	// ptr[bucket].storageIdsLookupMap = make(map[uint64]([]uint64))
 	ptr[bucket].finalized = true
+
+	ptr[bucket].pagesMutex.Unlock()
 
 	if activePages > 0 && len(timeSeriesIds) > 0 {
 		err := b.write(position, activePages, pages, timeSeriesIds, storageIds)
@@ -446,7 +442,7 @@ func (b *BucketStorage) write(position, activePages uint32, pages []*dataTypes.D
 	timeSeriesIds []uint32, storageIds []uint64) (err error) {
 
 	if len(timeSeriesIds) != len(storageIds) {
-		return errors.New("Length of timeSeriesIds and storageIds don't match!")
+		return fmt.Errorf("Length of timeSeriesIds and storageIds don't match!")
 	}
 
 	// Delete files older than 24h

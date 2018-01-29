@@ -5,9 +5,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io/ioutil"
+
 	"github.com/huangaz/tsdb/lib/dataTypes"
 	"github.com/huangaz/tsdb/lib/fileUtils"
-	"io/ioutil"
 )
 
 type DataBlockReader struct {
@@ -28,13 +29,12 @@ func NewDataBlockReader(shardId int64, dataDiretory string) *DataBlockReader {
 	return res
 }
 
-// Returns allocated blocks for every page in the given position.
-// Fills in timeSeriesIds and storageIds with the metadata associated with
-// the blocks.
-func (d *DataBlockReader) ReadBlocks(position uint32) (pointers [](*dataTypes.DataBlock),
+// Returns allocated blocks for every page with the given id. Fills in
+// timeSeriesIds and storageIds with the metadata associated with the blocks.
+func (d *DataBlockReader) ReadBlocks(id uint32) (pointers [](*dataTypes.DataBlock),
 	timeSeriesIds []uint32, storageIds []uint64, err error) {
 
-	f, err := d.dataFiles_.Open(int(position), "r")
+	f, err := d.dataFiles_.Open(int(id), "r")
 	if err != nil {
 		return pointers, nil, nil, err
 	}

@@ -2,10 +2,11 @@ package dataBlockReader
 
 import (
 	"encoding/binary"
-	"github.com/huangaz/tsdb/lib/dataTypes"
-	"github.com/huangaz/tsdb/lib/testUtil"
 	"os"
 	"testing"
+
+	"github.com/huangaz/tsdb/lib/dataTypes"
+	"github.com/huangaz/tsdb/lib/testUtil"
 )
 
 var (

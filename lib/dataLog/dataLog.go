@@ -6,10 +6,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/huangaz/tsdb/lib/bitUtil"
-	"github.com/huangaz/tsdb/lib/fileUtils"
 	"io/ioutil"
 	"math"
+
+	"github.com/huangaz/tsdb/lib/bitUtil"
+	"github.com/huangaz/tsdb/lib/fileUtils"
 )
 
 const (

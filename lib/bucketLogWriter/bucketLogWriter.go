@@ -1,12 +1,13 @@
 package bucketLogWriter
 
 import (
+	"log"
+	"time"
+
 	"github.com/huangaz/tsdb/lib/bucketUtils"
 	"github.com/huangaz/tsdb/lib/dataLog"
 	"github.com/huangaz/tsdb/lib/dataTypes"
 	"github.com/huangaz/tsdb/lib/fileUtils"
-	"log"
-	"time"
 )
 
 type BucketLogWriter struct {
@@ -275,7 +276,7 @@ func (b *BucketLogWriter) writeOneLogEntry() bool {
 
 			if logWriter != nil {
 				logWriter.Append(uint32(info.index), info.unixTime, info.value)
-				// logWriter.DeleteDataLogWriter()
+				// flushBuffer() when debugging
 				logWriter.FlushBuffer()
 			}
 		}

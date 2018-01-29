@@ -1,8 +1,9 @@
 package persistentKeyList
 
 import (
-	"github.com/huangaz/tsdb/lib/testUtil"
 	"testing"
+
+	"github.com/huangaz/tsdb/lib/testUtil"
 )
 
 var (

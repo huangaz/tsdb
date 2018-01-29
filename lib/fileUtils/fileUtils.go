@@ -40,7 +40,7 @@ func (f *FileUtils) Open(id int, mode string) (res File, err error) {
 		return res, err
 	}
 
-	res.File, err = os.OpenFile(path, flag, 0777)
+	res.File, err = os.OpenFile(path, flag, 0644)
 	if err != nil {
 		return res, err
 	}

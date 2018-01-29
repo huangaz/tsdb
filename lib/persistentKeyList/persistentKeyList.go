@@ -7,13 +7,14 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/huangaz/tsdb/lib/dataTypes"
-	"github.com/huangaz/tsdb/lib/fileUtils"
 	"io/ioutil"
 	"log"
 	"math/rand"
 	"sync"
 	"time"
+
+	"github.com/huangaz/tsdb/lib/dataTypes"
+	"github.com/huangaz/tsdb/lib/fileUtils"
 )
 
 type PersistentKeyList struct {

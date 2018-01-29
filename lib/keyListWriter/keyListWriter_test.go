@@ -1,10 +1,11 @@
 package keyListWriter
 
 import (
-	"github.com/huangaz/tsdb/lib/persistentKeyList"
-	"github.com/huangaz/tsdb/lib/testUtil"
 	"testing"
 	"time"
+
+	"github.com/huangaz/tsdb/lib/persistentKeyList"
+	"github.com/huangaz/tsdb/lib/testUtil"
 )
 
 var (

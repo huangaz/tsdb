@@ -1,10 +1,11 @@
 package bucketedTimeSeries
 
 import (
+	"testing"
+
 	"github.com/huangaz/tsdb/lib/bucketStorage"
 	"github.com/huangaz/tsdb/lib/testUtil"
 	"github.com/huangaz/tsdb/lib/timeSeries"
-	"testing"
 )
 
 var (

@@ -8,7 +8,6 @@ import (
 	"github.com/huangaz/tsdb/lib/bucketLogWriter"
 	"github.com/huangaz/tsdb/lib/dataTypes"
 	"github.com/huangaz/tsdb/lib/keyListWriter"
-	"github.com/huangaz/tsdb/lib/persistentKeyList"
 	"github.com/huangaz/tsdb/lib/testUtil"
 	"github.com/huangaz/tsdb/lib/timeConstants"
 )
@@ -84,16 +83,13 @@ func testReads(m *BucketMap, t *testing.T) {
 			}
 		}
 	}
-
-	ptrs := m.GetEverything()
-	fmt.Printf("Length of ptrs is: %d\n", len(ptrs))
 }
 
 /*
 func TestTimeSeries(t *testing.T) {
-	var shardId int64 = 10
+	var shardId int64 = 100
 	testUtil.PathCreate(shardId)
-	defer testUtil.FileDelete()
+	// defer testUtil.FileDelete()
 
 	k := keyListWriter.NewKeyListWriter(dataDirectory, 100)
 	b := bucketLogWriter.NewBucketLogWriter(4*timeConstants.SECONDS_PER_HOUR, dataDirectory, 100, 0)
@@ -106,9 +102,9 @@ func TestTimeSeries(t *testing.T) {
 */
 
 func TestReload(t *testing.T) {
-	var shardId int64 = 10
+	var shardId int64 = 4
 	testUtil.PathCreate(shardId)
-	defer testUtil.FileDelete()
+	// defer testUtil.FileDelete()
 
 	k := keyListWriter.NewKeyListWriter(dataDirectory, 100)
 	b := bucketLogWriter.NewBucketLogWriter(4*timeConstants.SECONDS_PER_HOUR, dataDirectory, 100, 0)
@@ -119,15 +115,16 @@ func TestReload(t *testing.T) {
 	m := NewBucketMap(6, 4*timeConstants.SECONDS_PER_HOUR, shardId, dataDirectory, k, b, OWNED)
 	testMap(m, t)
 
+	// recover datas from disk
 	m2 := NewBucketMap(6, 4*timeConstants.SECONDS_PER_HOUR, shardId, dataDirectory, k, b, OWNED)
-	if success := m2.SetState(PRE_UNOWNED); !success {
-		t.Fatal("set state failed!")
+	if err := m2.SetState(PRE_UNOWNED); err != nil {
+		t.Fatal(err)
 	}
-	if success := m2.SetState(UNOWNED); !success {
-		t.Fatal("set state failed!")
+	if err := m2.SetState(UNOWNED); err != nil {
+		t.Fatal(err)
 	}
-	if success := m2.SetState(PRE_OWNED); !success {
-		t.Fatal("set state failed!")
+	if err := m2.SetState(PRE_OWNED); err != nil {
+		t.Fatal(err)
 	}
 
 	if err := m2.ReadKeyList(); err != nil {
@@ -139,65 +136,72 @@ func TestReload(t *testing.T) {
 	for more, _ := m2.ReadBlockFiles(); more; more, _ = m2.ReadBlockFiles() {
 	}
 
+	if m2.GetState() != OWNED {
+		t.Fatal("state isn't OWNED")
+	}
+
 	testReads(m2, t)
 
-	// Now wipe the key_list file and reload the data yet again.
-	// We have to give KeyListWriter at least one key to make it replace the file.
-	item := persistentKeyList.KeyItem{0, "a key", 0}
-	err := k.Compact(shardId, func() persistentKeyList.KeyItem {
-		item2 := item
-		item.Key = ""
-		return item2
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Read it all again.
-	// This time, insert a point before reading blocks. This point should not have
-	// older data.
-	m3 := NewBucketMap(6, 4*timeConstants.SECONDS_PER_HOUR, shardId, dataDirectory, k, b, OWNED)
-	if success := m3.SetState(PRE_UNOWNED); !success {
-		t.Fatal("set state failed!")
-	}
-	if success := m3.SetState(UNOWNED); !success {
-		t.Fatal("set state failed!")
-	}
-	if err := m3.ReadKeyList(); err != nil {
-		t.Fatal(err)
-	}
-	if err := m3.ReadData(); err != nil {
-		t.Fatal(err)
-	}
-	// Add a point. This will get assigned an ID that still has block
-	// data on disk.
-	var dp dataTypes.DataPoint
-	dp.Value = 100.0
-	dp.Timestamp = m3.Timestamp(2)
-	if _, _, err := m3.Put("another key", dp, 0, false); err != nil {
-		t.Fatal(err)
-	}
-	for more, _ := m3.ReadBlockFiles(); more; more, _ = m3.ReadBlockFiles() {
-	}
-
-	everything := m3.GetEverything()
-	var have int = 0
-	for _, thing := range everything {
-		if thing != nil {
-			have++
+	/*
+		// Now wipe the key_list file and reload the data yet again.
+		// We have to give KeyListWriter at least one key to make it replace the file.
+		item := persistentKeyList.KeyItem{0, "a key", 0}
+		err := k.Compact(shardId, func() persistentKeyList.KeyItem {
+			item2 := item
+			item.Key = ""
+			return item2
+		})
+		if err != nil {
+			t.Fatal(err)
 		}
-	}
-	if have != 2 {
-		t.Fatal("the number of keys is wrong")
-	}
-	out, err := m3.GetItem("another key").S.Get(0, uint32(m3.Timestamp(3)), m3.GetStorage())
-	if len(out) != 1 {
-		t.Fatal("length of output is wrong")
-	}
+
+		// Read it all again.
+		// This time, insert a point before reading blocks. This point should not have
+		// older data.
+		m3 := NewBucketMap(6, 4*timeConstants.SECONDS_PER_HOUR, shardId, dataDirectory, k, b, OWNED)
+		if err := m3.SetState(PRE_UNOWNED); err != nil {
+			t.Fatal(err)
+		}
+		if err := m3.SetState(UNOWNED); err != nil {
+			t.Fatal(err)
+		}
+		if err := m3.ReadKeyList(); err != nil {
+			t.Fatal(err)
+		}
+		if err := m3.ReadData(); err != nil {
+			t.Fatal(err)
+		}
+		// Add a point. This will get assigned an ID that still has block
+		// data on disk.
+		var dp dataTypes.DataPoint
+		dp.Value = 100.0
+		dp.Timestamp = m3.Timestamp(2)
+		if _, _, err := m3.Put("another key", dp, 0, false); err != nil {
+			t.Fatal(err)
+		}
+		for more, _ := m3.ReadBlockFiles(); more; more, _ = m3.ReadBlockFiles() {
+		}
+
+		everything := m3.GetEverything()
+		var have int = 0
+		for _, thing := range everything {
+			if thing != nil {
+				have++
+			}
+		}
+		if have != 2 {
+			t.Fatal("the number of keys is wrong")
+		}
+		out, err := m3.GetItem("another key").S.Get(0, uint32(m3.Timestamp(3)), m3.GetStorage())
+		if len(out) != 1 {
+			t.Fatal("length of output is wrong")
+		}
+	*/
 }
 
+/*
 func TestPut(t *testing.T) {
-	var shardId int64 = 10
+	var shardId int64 = 17
 	testUtil.PathCreate(shardId)
 	// defer testUtil.FileDelete()
 
@@ -209,11 +213,11 @@ func TestPut(t *testing.T) {
 	// Fill, then close the BucketMap.
 	m := NewBucketMap(6, 4*timeConstants.SECONDS_PER_HOUR, shardId, dataDirectory, k, b, OWNED)
 	testMap(m, t)
-	if success := m.SetState(PRE_UNOWNED); !success {
-		t.Fatal("set state failed!")
+	if err := m.SetState(PRE_UNOWNED); err != nil {
+		t.Fatal(err)
 	}
-	if success := m.SetState(UNOWNED); !success {
-		t.Fatal("set state failed!")
+	if err := m.SetState(UNOWNED); err != nil {
+		t.Fatal(err)
 	}
 
 	m2 := NewBucketMap(6, 4*timeConstants.SECONDS_PER_HOUR, shardId, dataDirectory, k, b, UNOWNED)
@@ -227,8 +231,8 @@ func TestPut(t *testing.T) {
 	}
 
 	// PRE_OWNED
-	if success := m2.SetState(PRE_OWNED); !success {
-		t.Fatal("set state failed")
+	if err := m2.SetState(PRE_OWNED); err != nil {
+		t.Fatal(err)
 	}
 	if res1, res2, err := m2.Put("test string 2", dp, 10, false); res1 != 0 || res2 != 1 || err != nil {
 		t.Fatal("Wrong result of Put() when state is PRE_OWNED")
@@ -285,7 +289,8 @@ func TestPut(t *testing.T) {
 	}
 }
 
-/*
+*/
+
 func TestPutAndGet(t *testing.T) {
 	var shardId int64 = 10
 	testUtil.PathCreate(shardId)
@@ -327,4 +332,3 @@ func TestPutAndGet(t *testing.T) {
 
 	fmt.Println(res)
 }
-*/

@@ -3,12 +3,13 @@ package bucketedTimeSeries
 
 import (
 	"errors"
+	"math"
+	"sync"
+
 	"github.com/huangaz/tsdb/lib/bucketStorage"
 	"github.com/huangaz/tsdb/lib/dataTypes"
 	"github.com/huangaz/tsdb/lib/timeSeriesStream"
 	"github.com/huangaz/tsdb/lib/utils"
-	"math"
-	"sync"
 )
 
 const (
@@ -70,20 +71,20 @@ func (b *BucketedTimeSeries) open(next, timeSeriesId uint32,
 		return nil
 	}
 
-	var block uint64
+	var blockId uint64
 	// Wipe all the blocks in between.
 	for b.current_ != next {
 		if b.count_ > 0 {
 			// Copy out the active data.
-			block, err = storage.Store(b.current_, b.stream_.Bs.Stream, b.count_,
+			blockId, err = storage.Store(b.current_, b.stream_.Bs.Stream, b.count_,
 				timeSeriesId)
 			if err != nil {
 				return err
 			}
 		} else {
-			block = bucketStorage.INVALID_ID
+			blockId = bucketStorage.INVALID_ID
 		}
-		b.blocks_[b.current_%uint32(storage.NumBuckets())] = block
+		b.blocks_[b.current_%uint32(storage.NumBuckets())] = blockId
 
 		// Prepare for writes.
 		b.count_ = 0

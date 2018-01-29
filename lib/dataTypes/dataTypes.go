@@ -10,6 +10,18 @@ bucketNumber 	: uint32
 windowSize 	: uint64
 */
 
+const (
+	DATA_BLOCK_SIZE = 65536
+	PAGE_SIZE       = DATA_BLOCK_SIZE
+	DATA_PRE_FIX    = "block_data"
+	COMPLETE_PREFIX = "complete_block"
+	LOG_FILE_PREFIX = "log"
+	KEY_FILE_PREFIX = "key_list"
+
+	// Number of maps for gorilla to use
+	GORILLA_SHARDS = 100
+)
+
 type Data struct {
 	Key     string
 	ShardId int64
@@ -49,15 +61,6 @@ type GetResponse struct {
 	Key string
 	Dps []*DataPoint
 }
-
-const (
-	DATA_BLOCK_SIZE = 65536
-	PAGE_SIZE       = DATA_BLOCK_SIZE
-	DATA_PRE_FIX    = "block_data"
-	COMPLETE_PREFIX = "complete_block"
-	LOG_FILE_PREFIX = "log"
-	KEY_FILE_PREFIX = "key_list"
-)
 
 func (p *PutRequest) String() string {
 	var res string

@@ -5,6 +5,10 @@ package bucketMap
 
 import (
 	"fmt"
+	"log"
+	"sync"
+	"time"
+
 	"github.com/huangaz/tsdb/lib/bucketLogWriter"
 	"github.com/huangaz/tsdb/lib/bucketStorage"
 	"github.com/huangaz/tsdb/lib/bucketUtils"
@@ -18,9 +22,6 @@ import (
 	"github.com/huangaz/tsdb/lib/timeSeriesStream"
 	"github.com/huangaz/tsdb/lib/timer"
 	"github.com/huangaz/tsdb/lib/utils/priorityQueue"
-	"log"
-	"sync"
-	"time"
 )
 
 const (
@@ -193,30 +194,20 @@ func (b *BucketMap) Put(key string, value dataTypes.DataPoint, category uint16,
 		switch state {
 		case UNOWNED:
 			return NOT_OWNED, NOT_OWNED, nil
-		case PRE_OWNED:
-			fallthrough
-		case READING_KEYS:
+		case PRE_OWNED, READING_KEYS:
 			b.queueDataPointWithKey(key, value, category)
 			// Assume the data point will be added and no new keys will be
 			// added. This might not be the case but these return values
 			// are only used for counters.
 			return 0, 1, nil
-		case READING_KEYS_DONE:
-			fallthrough
-		case READING_LOGS:
-			fallthrough
-		case PROCESSING_QUEUED_DATA_POINTS:
+		case READING_KEYS_DONE, READING_LOGS, PROCESSING_QUEUED_DATA_POINTS:
 			if existingItem != nil {
 				b.queueDataPointWithId(id, value, category)
 			} else {
 				b.queueDataPointWithKey(key, value, category)
 			}
 			return 0, 1, nil
-		case READING_BLOCK_DATA:
-			fallthrough
-		case OWNED:
-			fallthrough
-		case PRE_UNOWNED:
+		case READING_BLOCK_DATA, OWNED, PRE_UNOWNED:
 			// Continue normal processing. PRE_UNOWNED is still completely
 			// considered to be owned.
 			break
@@ -278,7 +269,7 @@ func (b *BucketMap) Put(key string, value dataTypes.DataPoint, category uint16,
 	return 1, 1, nil
 }
 
-func stateString(state int) string {
+func StateString(state int) string {
 	var res string
 	switch state {
 	case PRE_UNOWNED:
@@ -389,6 +380,8 @@ func (b *BucketMap) Get(key string, begin, end int64) (res []dataTypes.DataPoint
 		return nil, err
 	}
 
+	item.S.SetQueried()
+
 	for _, block := range blocks {
 		out, err := timeSeriesStream.ReadValues(block.Data, begin, end, int(block.Count))
 		if err != nil {
@@ -491,8 +484,8 @@ func (b *BucketMap) DeleteOldBlockFiles() error {
 func (b *BucketMap) ReadKeyList() error {
 	// Timer := timer.NewTimer(true)
 
-	if success := b.SetState(READING_KEYS); !success {
-		return fmt.Errorf("Setting state failed!")
+	if err := b.SetState(READING_KEYS); err != nil {
+		return err
 	}
 
 	persistentKeyList.ReadKeys(b.shardId_, b.dataDirectory_, func(item persistentKeyList.KeyItem) bool {
@@ -542,8 +535,8 @@ func (b *BucketMap) ReadKeyList() error {
 	}
 
 	b.rowsFromDisk_ = b.GetEverything()
-	if success := b.SetState(READING_KEYS_DONE); !success {
-		return fmt.Errorf("Setting state failed!")
+	if err := b.SetState(READING_KEYS_DONE); err != nil {
+		return err
 	}
 
 	return nil
@@ -551,17 +544,16 @@ func (b *BucketMap) ReadKeyList() error {
 
 // Sets the state. Returns true if state was set, false if the state
 // transition is not allowed or already in that state.
-func (b *BucketMap) SetState(state int) bool {
+func (b *BucketMap) SetState(state int) error {
 	if state < PRE_UNOWNED || state > OWNED {
-		return false
+		return fmt.Errorf("Invalid state!")
 	}
 
 	b.rwLock_.Lock()
 
 	if !isAllowedStateTransition(b.state_, state) {
-		log.Printf("Illegal transition of state from %s to %s", stateString(b.state_),
-			stateString(b.state_))
-		return false
+		return fmt.Errorf("Illegal transition of state from %s to %s", StateString(b.state_),
+			StateString(b.state_))
 	}
 
 	switch state {
@@ -603,7 +595,7 @@ func (b *BucketMap) SetState(state int) bool {
 		log.Printf("Change state of shard %d from %s to %s. ", b.shardId_, stateString(oldState),
 			stateString(state))
 	*/
-	return true
+	return nil
 }
 
 func isAllowedStateTransition(from, to int) bool {
@@ -612,8 +604,8 @@ func isAllowedStateTransition(from, to int) bool {
 
 // Raads the data. The function should be called after calling readKeyList.
 func (b *BucketMap) ReadData() (err error) {
-	if success := b.SetState(READING_LOGS); !success {
-		return fmt.Errorf("Setting state failed!")
+	if err := b.SetState(READING_LOGS); err != nil {
+		return err
 	}
 
 	reader := dataBlockReader.NewDataBlockReader(b.shardId_, b.dataDirectory_)
@@ -635,11 +627,11 @@ func (b *BucketMap) ReadData() (err error) {
 
 	b.readLogFiles(b.lastFinalizedBucket_)
 	if b.GetState() != READING_LOGS {
-		return fmt.Errorf("Must be state: %s", stateString(READING_LOGS))
+		return fmt.Errorf("Must be state: %s", StateString(READING_LOGS))
 	}
 
-	if success := b.SetState(PROCESSING_QUEUED_DATA_POINTS); !success {
-		return fmt.Errorf("Setting state failed!")
+	if err := b.SetState(PROCESSING_QUEUED_DATA_POINTS); err != nil {
+		return err
 	}
 
 	// Skip state check when processing queued data points.
@@ -648,8 +640,8 @@ func (b *BucketMap) ReadData() (err error) {
 	// There's a tiny chance that incoming data points will think that
 	// the state is PROCESSING_QUEUED_DATA_POINTS and they will be
 	// queued after the second call to processQueuedDataPoints.
-	if success := b.SetState(READING_BLOCK_DATA); !success {
-		return fmt.Errorf("Setting state failed!")
+	if err := b.SetState(READING_BLOCK_DATA); err != nil {
+		return err
 	}
 
 	// Process queued data points again, just to be sure that the queue
@@ -688,15 +680,18 @@ func (b *BucketMap) checkForMissingBlockFiles() {
 func (b *BucketMap) readLogFiles(lastBlock uint32) error {
 	files := fileUtils.NewFileUtils(b.shardId_, dataTypes.LOG_FILE_PREFIX, b.dataDirectory_)
 	var unknownKeys uint32 = 0
-	lastTimestamp := b.Timestamp(lastBlock + 1)
+	// lastTimestamp := b.Timestamp(lastBlock + 1)
+	lastTimestamp := b.Timestamp(lastBlock)
 
 	ids, err := files.Ls()
 	if err != nil {
 		return err
 	}
+
 	for _, id := range ids {
-		if int64(id) < b.Timestamp(lastBlock+1) {
-			// log.Printf("Skipping log file %d because it's already covered by a block", id)
+		// if int64(id) < b.Timestamp(lastBlock+1) {
+		if lastBlock != 0 && int64(id) < b.Timestamp(lastBlock) {
+			log.Printf("Skipping log file %d because it's already covered by a block", id)
 			continue
 		}
 
@@ -711,7 +706,8 @@ func (b *BucketMap) readLogFiles(lastBlock uint32) error {
 
 		dataLog.ReadLog(&file, int64(id), func(index uint32, unixTime int64, value float64) bool {
 
-			if unixTime < b.Timestamp(bucketNum) || unixTime > b.Timestamp(bucketNum+1) {
+			if bucketNum > 0 && (unixTime < b.Timestamp(bucketNum) || unixTime > b.Timestamp(bucketNum+1)) {
+
 				log.Printf("Unix time is out of the expected range: %d [%d,%d]",
 					unixTime, b.Timestamp(bucketNum), b.Timestamp(bucketNum+1))
 
@@ -819,9 +815,9 @@ func (b *BucketMap) ReadBlockFiles() (bool, error) {
 
 	l := len(b.unreadBlockFiles_)
 	if l == 0 {
-		if success := b.SetState(OWNED); !success {
+		if err := b.SetState(OWNED); err != nil {
 			b.mutex_.Unlock()
-			return false, fmt.Errorf("Setting state failed!")
+			return false, err
 		}
 		b.mutex_.Unlock()
 		return false, nil
@@ -835,6 +831,7 @@ func (b *BucketMap) ReadBlockFiles() (bool, error) {
 
 	timeSeriesIds, storageIds, err := b.storage_.LoadPosition(position)
 	if err != nil {
+		log.Println(err)
 		return false, fmt.Errorf("Failed to read blockfiles for shard %d: %d",
 			b.shardId_, position)
 	}
@@ -869,7 +866,10 @@ func (b *BucketMap) CancelUnowning() bool {
 // If the shard is not owned, will return immediately with 0.
 func (b *BucketMap) FinalizeBuckets(lastBucketToFinalize uint32) (int, error) {
 
+	log.Printf("lastBucketToFinalize: %d,b.lastFinalizedBucket_: %d", lastBucketToFinalize, b.lastFinalizedBucket_)
+
 	if b.GetState() != OWNED {
+		log.Println("not owned!")
 		return 0, nil
 	}
 
@@ -889,6 +889,9 @@ func (b *BucketMap) FinalizeBuckets(lastBucketToFinalize uint32) (int, error) {
 	bucketsToFinalize := lastBucketToFinalize - bucketToFinalize + 1
 	items := b.GetEverything()
 	for bucket := bucketToFinalize; bucket <= lastBucketToFinalize; bucket++ {
+
+		log.Println("Attempt to finalize bucket :", bucket)
+
 		for i, item := range items {
 			if item != nil {
 				// `i` is the id of the time series

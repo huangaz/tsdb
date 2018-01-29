@@ -1,10 +1,11 @@
 package dataLog
 
 import (
-	"github.com/huangaz/tsdb/lib/fileUtils"
-	"github.com/huangaz/tsdb/lib/testUtil"
 	"reflect"
 	"testing"
+
+	"github.com/huangaz/tsdb/lib/fileUtils"
+	"github.com/huangaz/tsdb/lib/testUtil"
 )
 
 var (
