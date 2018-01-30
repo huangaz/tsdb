@@ -17,7 +17,7 @@ type KeyListWriter struct {
 	keyInfoQueue_  chan KeyInfo
 	dataDirectory_ string
 	lock_          sync.Mutex
-	keyWriters_    map[int64]*PersistentKeyList
+	keyWriters_    map[int32]*PersistentKeyList
 
 	// thread controller
 	stopThread_    chan struct{}
@@ -25,7 +25,7 @@ type KeyListWriter struct {
 }
 
 type KeyInfo struct {
-	shardId  int64
+	shardId  int32
 	key      string
 	keyId    int32
 	category uint16
@@ -36,7 +36,7 @@ func NewKeyListWriter(dataDirectory string, queueSize uint32) *KeyListWriter {
 	res := &KeyListWriter{
 		keyInfoQueue_:  make(chan KeyInfo, queueSize),
 		dataDirectory_: dataDirectory,
-		keyWriters_:    make(map[int64]*PersistentKeyList),
+		keyWriters_:    make(map[int32]*PersistentKeyList),
 		threadIsRuning: false,
 	}
 
@@ -50,7 +50,7 @@ func (k *KeyListWriter) DeleteKeyListWriter() {
 }
 
 // Copy a new key onto the queue for writing.
-func (k *KeyListWriter) AddKey(shardId int64, id int32, key string, category uint16) {
+func (k *KeyListWriter) AddKey(shardId, id int32, key string, category uint16) {
 	var info KeyInfo
 	info.shardId = shardId
 	info.key = key
@@ -62,7 +62,7 @@ func (k *KeyListWriter) AddKey(shardId int64, id int32, key string, category uin
 }
 
 // Pass a compaction call down to the appropriate PersistentKeyList.
-func (k *KeyListWriter) Compact(shardId int64, generator func() KeyItem) error {
+func (k *KeyListWriter) Compact(shardId int32, generator func() KeyItem) error {
 	writer := k.get(shardId)
 	if writer == nil {
 		return fmt.Errorf("Trying to compact non-enabled shard %d", shardId)
@@ -74,21 +74,21 @@ func (k *KeyListWriter) Compact(shardId int64, generator func() KeyItem) error {
 	return nil
 }
 
-func (k *KeyListWriter) StartShard(shardId int64) {
+func (k *KeyListWriter) StartShard(shardId int32) {
 	var info KeyInfo
 	info.shardId = shardId
 	info.keyType = START_SHARD
 	k.keyInfoQueue_ <- info
 }
 
-func (k *KeyListWriter) StopShard(shardId int64) {
+func (k *KeyListWriter) StopShard(shardId int32) {
 	var info KeyInfo
 	info.shardId = shardId
 	info.keyType = STOP_SHARD
 	k.keyInfoQueue_ <- info
 }
 
-func (k *KeyListWriter) get(shardId int64) *PersistentKeyList {
+func (k *KeyListWriter) get(shardId int32) *PersistentKeyList {
 	k.lock_.Lock()
 	defer k.lock_.Unlock()
 
@@ -99,13 +99,13 @@ func (k *KeyListWriter) get(shardId int64) *PersistentKeyList {
 	return res
 }
 
-func (k *KeyListWriter) enable(shardId int64) {
+func (k *KeyListWriter) enable(shardId int32) {
 	k.lock_.Lock()
 	defer k.lock_.Unlock()
 	k.keyWriters_[shardId] = NewPersistentKeyList(shardId, k.dataDirectory_)
 }
 
-func (k *KeyListWriter) disable(shardId int64) {
+func (k *KeyListWriter) disable(shardId int32) {
 	k.lock_.Lock()
 	defer k.lock_.Unlock()
 	delete(k.keyWriters_, shardId)

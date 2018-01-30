@@ -9,7 +9,7 @@ import (
 
 func TestWriteSingleValue(t *testing.T) {
 
-	var shardId int64 = 54
+	var shardId int32 = 54
 	var windowSize uint64 = 100
 	var unixTime int64 = 6480
 	var dataDirectory string = DataDirectory_Test
@@ -43,7 +43,7 @@ func TestWriteSingleValue(t *testing.T) {
 
 func TestThreadWrite(t *testing.T) {
 	var (
-		shardId       int64  = 23
+		shardId       int32  = 23
 		windowSize    uint64 = 100
 		unixTime             = FloorTimestamp(5000, windowSize)
 		ts1                  = unixTime + 1
@@ -114,7 +114,7 @@ func TestThreadWrite(t *testing.T) {
 	writer.DeleteBucketLogWriter()
 }
 
-func readSingleValueFromLog(fileUtils FileUtils, shardId int64, expectedId uint32,
+func readSingleValueFromLog(fileUtils FileUtils, shardId int32, expectedId uint32,
 	expectedUnixTime int64, expectedValue float64, windowSize uint64) error {
 
 	baseTime := expectedUnixTime

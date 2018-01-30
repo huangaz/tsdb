@@ -13,7 +13,7 @@ type DataBlockReader struct {
 	completedFiles_ *FileUtils
 }
 
-func NewDataBlockReader(shardId int64, dataDiretory string) *DataBlockReader {
+func NewDataBlockReader(shardId int32, dataDiretory string) *DataBlockReader {
 	res := &DataBlockReader{
 		dataFiles_:      NewFileUtils(shardId, DATA_PRE_FIX, dataDiretory),
 		completedFiles_: NewFileUtils(shardId, COMPLETE_PREFIX, dataDiretory),

@@ -18,7 +18,7 @@ type PersistentKeyList struct {
 	activeList_ File
 	files_      FileUtils
 	lock_       sync.Mutex
-	shard_      int64
+	shard_      int32
 	// buffer_     string
 	buffer_                []byte
 	nextHardFlushTimeSecs_ int64
@@ -47,7 +47,7 @@ var (
 	KeyFilePrefix = KEY_FILE_PREFIX
 )
 
-func NewPersistentKeyList(shardId int64, dataDirectory string) *PersistentKeyList {
+func NewPersistentKeyList(shardId int32, dataDirectory string) *PersistentKeyList {
 	res := &PersistentKeyList{
 		activeList_: File{File: nil, Name: ""},
 		files_:      *NewFileUtils(shardId, KeyFilePrefix, dataDirectory),
@@ -147,7 +147,7 @@ func (p *PersistentKeyList) flush(hardFlush bool) error {
 
 // Call f on each key in the list.
 // The callback should return false if reading should be stopped.
-func ReadKeys(shardId int64, dataDirectory string, f func(KeyItem) bool) (int, error) {
+func ReadKeys(shardId int32, dataDirectory string, f func(KeyItem) bool) (int, error) {
 
 	files := NewFileUtils(shardId, KeyFilePrefix, dataDirectory)
 

@@ -22,26 +22,6 @@ const (
 	GORILLA_SHARDS = 100
 )
 
-type Key struct {
-	Key     string
-	ShardId int64
-}
-
-type TimeValuePair struct {
-	Value     float64
-	Timestamp int64
-}
-
-type DataPoint struct {
-	Key   *Key
-	Value *TimeValuePair
-}
-
-type DataPoints struct {
-	Key    *Key
-	Values []*TimeValuePair
-}
-
 type DataBlock struct {
 	Data [DATA_BLOCK_SIZE]byte
 }

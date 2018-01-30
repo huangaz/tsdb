@@ -13,7 +13,7 @@ type BucketLogWriter struct {
 	keepLogFilesAroundTime_ uint64
 
 	// shardId to *ShardWriter
-	shardWriters_ map[int64](*ShardWriter)
+	shardWriters_ map[int32](*ShardWriter)
 
 	// MPMCQueue
 	logDataQueue_ chan LogDataInfo
@@ -25,7 +25,7 @@ type BucketLogWriter struct {
 
 type LogDataInfo struct {
 	index    int32
-	shardId  int64
+	shardId  int32
 	unixTime int64
 	value    float64
 }
@@ -68,7 +68,7 @@ func NewBucketLogWriter(windowSize uint64, dataDirectory string, queueSize,
 		keepLogFilesAroundTime_: Duration(2, windowSize),
 		logDataQueue_:           make(chan LogDataInfo, queueSize),
 		threadIsRuning:          false,
-		shardWriters_:           make(map[int64](*ShardWriter)),
+		shardWriters_:           make(map[int32](*ShardWriter)),
 	}
 
 	if windowSize <= uint64(allowTimestampBehind) {
@@ -156,7 +156,7 @@ func (b *BucketLogWriter) flushQueue() {
 }
 
 // This will push the given data entry to a queue for logging.
-func (b *BucketLogWriter) LogData(shardId int64, index int32, unixTime int64,
+func (b *BucketLogWriter) LogData(shardId, index int32, unixTime int64,
 	value float64) {
 
 	var info LogDataInfo
@@ -293,7 +293,7 @@ func (b *BucketLogWriter) writeOneLogEntry() bool {
 }
 
 // Starts writing points for this shard.
-func (b *BucketLogWriter) StartShard(shardId int64) {
+func (b *BucketLogWriter) StartShard(shardId int32) {
 	var info LogDataInfo
 	info.shardId = shardId
 	info.index = START_SHARD_INDEX
@@ -301,7 +301,7 @@ func (b *BucketLogWriter) StartShard(shardId int64) {
 }
 
 // Stops writing points for this shard and closes all the open files.
-func (b *BucketLogWriter) StopShard(shardId int64) {
+func (b *BucketLogWriter) StopShard(shardId int32) {
 	var info LogDataInfo
 	info.shardId = shardId
 	b.logDataQueue_ <- info
