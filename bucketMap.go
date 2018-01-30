@@ -80,7 +80,7 @@ type BucketMap struct {
 
 	storage_       *BucketStorage
 	state_         int
-	shardId_       int64
+	shardId_       int32
 	dataDirectory_ string
 
 	keyWriter_ *KeyListWriter
@@ -124,7 +124,7 @@ type Item struct {
 	S   *BucketedTimeSeries
 }
 
-func NewBucketMap(buckets uint8, windowSize uint64, shardId int64, dataDirectory string,
+func NewBucketMap(buckets uint8, windowSize uint64, shardId int32, dataDirectory string,
 	keyWriter *KeyListWriter, logWriter *BucketLogWriter,
 	state int) *BucketMap {
 
@@ -919,6 +919,6 @@ func (b *BucketMap) GetReliableDataStartTime() int64 {
 	return b.reliableDataStartTime_
 }
 
-func (b *BucketMap) GetShardId() int64 {
+func (b *BucketMap) GetShardId() int32 {
 	return b.shardId_
 }

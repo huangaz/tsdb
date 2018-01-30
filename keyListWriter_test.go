@@ -6,7 +6,7 @@ import (
 )
 
 func TestKeyWriteAndRead(t *testing.T) {
-	var shardId int64 = 321
+	var shardId int32 = 321
 	PathCreate(shardId)
 	defer FileDelete()
 
@@ -39,7 +39,7 @@ func TestKeyWriteAndRead(t *testing.T) {
 }
 
 func TestKeyCompactAndRead(t *testing.T) {
-	var shardId int64 = 321
+	var shardId int32 = 321
 	PathCreate(shardId)
 	defer FileDelete()
 

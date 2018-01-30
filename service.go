@@ -10,7 +10,7 @@ import (
 type TsdbService struct {
 	sync.RWMutex
 	buckets map[int]*BucketMap
-	ids     []int64
+	ids     []int32
 }
 
 func NewService() *TsdbService {
@@ -19,7 +19,7 @@ func NewService() *TsdbService {
 
 func (t *TsdbService) Start() (err error) {
 	// config adapter not done
-	t.ids = make([]int64, 1)
+	t.ids = make([]int32, 1)
 	t.ids[0] = 1
 
 	t.buckets = make(map[int]*BucketMap)
@@ -76,7 +76,7 @@ func (t *TsdbService) Put(req *PutRequest) (*PutResponse, error) {
 			return res, fmt.Errorf("key not exit")
 		}
 
-		newRows, dataPoints, err := m.Put(data.Key.Key, TimeValuePair{Value: data.Value.Value,
+		newRows, dataPoints, err := m.Put(string(data.Key.Key), TimeValuePair{Value: data.Value.Value,
 			Timestamp: data.Value.Timestamp}, 0, false)
 		if err != nil {
 			return res, err

@@ -81,7 +81,7 @@ func NewBucketData() *BucketData {
 }
 
 // Return a new BucketStorage with the given bucket number, shardId and dataDirectory.
-func NewBueketStorage(numBuckets uint8, shardId int64, dataDirectory string) *BucketStorage {
+func NewBueketStorage(numBuckets uint8, shardId int32, dataDirectory string) *BucketStorage {
 	res := &BucketStorage{
 		numbuckets_:      numBuckets,
 		newestPosition_:  0,

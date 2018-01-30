@@ -90,7 +90,7 @@ func TestTimeSeries(t *testing.T) {
 */
 
 func TestReload(t *testing.T) {
-	var shardId int64 = 4
+	var shardId int32 = 4
 	var DataDirectory_Test = DataDirectory_Test
 	PathCreate(shardId)
 	// defer FileDelete()
@@ -189,7 +189,7 @@ func TestReload(t *testing.T) {
 }
 
 func TestPut(t *testing.T) {
-	var shardId int64 = 17
+	var shardId int32 = 17
 	PathCreate(shardId)
 	// defer FileDelete()
 
@@ -278,7 +278,7 @@ func TestPut(t *testing.T) {
 }
 
 func TestBucketPutAndGet(t *testing.T) {
-	var shardId int64 = 10
+	var shardId int32 = 10
 	PathCreate(shardId)
 	// defer FileDelete()
 
@@ -291,20 +291,20 @@ func TestBucketPutAndGet(t *testing.T) {
 	m := NewBucketMap(6, 4*SECONDS_PER_HOUR, shardId, DataDirectory_Test, k, b, OWNED)
 
 	testDatas := []DataPoint{
-		{Key: &Key{Key: "testa", ShardId: shardId},
+		{Key: &Key{Key: []byte("testa"), ShardId: shardId},
 			Value: &TimeValuePair{Value: 100.0, Timestamp: 60}},
-		{Key: &Key{Key: "testa", ShardId: shardId},
+		{Key: &Key{Key: []byte("testa"), ShardId: shardId},
 			Value: &TimeValuePair{Value: 110.0, Timestamp: 118}},
-		{Key: &Key{Key: "testa", ShardId: shardId},
+		{Key: &Key{Key: []byte("testa"), ShardId: shardId},
 			Value: &TimeValuePair{Value: 170.0, Timestamp: 183}},
-		{Key: &Key{Key: "testa", ShardId: shardId},
+		{Key: &Key{Key: []byte("testa"), ShardId: shardId},
 			Value: &TimeValuePair{Value: 210.0, Timestamp: 247}},
-		{Key: &Key{Key: "testa", ShardId: shardId},
+		{Key: &Key{Key: []byte("testa"), ShardId: shardId},
 			Value: &TimeValuePair{Value: 110.0, Timestamp: 300}},
 	}
 
 	for _, testData := range testDatas {
-		_, _, err := m.Put(testData.Key.Key, *testData.Value, 0, false)
+		_, _, err := m.Put(string(testData.Key.Key), *testData.Value, 0, false)
 		if err != nil {
 			t.Fatal(err)
 		}

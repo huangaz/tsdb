@@ -23,7 +23,7 @@ type File struct {
 }
 
 // Return a new FileUtils with the given shardId, prefix and dataDirectory
-func NewFileUtils(shardId int64, prefix, dataDirectory string) *FileUtils {
+func NewFileUtils(shardId int32, prefix, dataDirectory string) *FileUtils {
 	res := new(FileUtils)
 	res.directory_ = dataDirectory
 	res.prefix_ = prefix
