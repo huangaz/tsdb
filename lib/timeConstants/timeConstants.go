@@ -1,9 +1,0 @@
-package timeConstants
-
-const (
-	USEC_PER_MS        = 1000
-	SECONDS_PER_MINUTE = 60
-	MINUTES_PER_HOUR   = 60
-
-	SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR
-)
