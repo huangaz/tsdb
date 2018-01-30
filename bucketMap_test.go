@@ -93,7 +93,7 @@ func TestReload(t *testing.T) {
 	var shardId int32 = 4
 	var DataDirectory_Test = DataDirectory_Test
 	PathCreate(shardId)
-	// defer FileDelete()
+	defer FileDelete()
 
 	k := NewKeyListWriter(DataDirectory_Test, 100)
 	b := NewBucketLogWriter(4*SECONDS_PER_HOUR, DataDirectory_Test, 100, 0)
@@ -131,61 +131,59 @@ func TestReload(t *testing.T) {
 
 	testReads(m2, t)
 
-	/*
-		// Now wipe the key_list file and reload the data yet again.
-		// We have to give KeyListWriter at least one key to make it replace the file.
-		item := persistentKeyList.KeyItem{0, "a key", 0}
-		err := k.Compact(shardId, func() persistentKeyList.KeyItem {
-			item2 := item
-			item.Key = ""
-			return item2
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
+	// Now wipe the key_list file and reload the data yet again.
+	// We have to give KeyListWriter at least one key to make it replace the file.
+	item := KeyItem{0, "a key", 0}
+	err := k.Compact(shardId, func() KeyItem {
+		item2 := item
+		item.Key = ""
+		return item2
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		// Read it all again.
-		// This time, insert a point before reading blocks. This point should not have
-		// older data.
-		m3 := NewBucketMap(6, 4*SECONDS_PER_HOUR, shardId, DataDirectory_Test, k, b, OWNED)
-		if err := m3.SetState(PRE_UNOWNED); err != nil {
-			t.Fatal(err)
-		}
-		if err := m3.SetState(UNOWNED); err != nil {
-			t.Fatal(err)
-		}
-		if err := m3.ReadKeyList(); err != nil {
-			t.Fatal(err)
-		}
-		if err := m3.ReadData(); err != nil {
-			t.Fatal(err)
-		}
-		// Add a point. This will get assigned an ID that still has block
-		// data on disk.
-		var dp DataPoint
-		dp.Value = 100.0
-		dp.Timestamp = m3.Timestamp(2)
-		if _, _, err := m3.Put("another key", dp, 0, false); err != nil {
-			t.Fatal(err)
-		}
-		for more, _ := m3.ReadBlockFiles(); more; more, _ = m3.ReadBlockFiles() {
-		}
+	// Read it all again.
+	// This time, insert a point before reading blocks. This point should not have
+	// older data.
+	m3 := NewBucketMap(6, 4*SECONDS_PER_HOUR, shardId, DataDirectory_Test, k, b, OWNED)
+	if err := m3.SetState(PRE_UNOWNED); err != nil {
+		t.Fatal(err)
+	}
+	if err := m3.SetState(UNOWNED); err != nil {
+		t.Fatal(err)
+	}
+	if err := m3.ReadKeyList(); err != nil {
+		t.Fatal(err)
+	}
+	if err := m3.ReadData(); err != nil {
+		t.Fatal(err)
+	}
+	// Add a point. This will get assigned an ID that still has block
+	// data on disk.
+	var v TimeValuePair
+	v.Value = 100.0
+	v.Timestamp = m3.Timestamp(2)
+	if _, _, err := m3.Put("another key", v, 0, false); err != nil {
+		t.Fatal(err)
+	}
+	for more, _ := m3.ReadBlockFiles(); more; more, _ = m3.ReadBlockFiles() {
+	}
 
-		everything := m3.GetEverything()
-		var have int = 0
-		for _, thing := range everything {
-			if thing != nil {
-				have++
-			}
+	everything := m3.GetEverything()
+	var have int = 0
+	for _, thing := range everything {
+		if thing != nil {
+			have++
 		}
-		if have != 2 {
-			t.Fatal("the number of keys is wrong")
-		}
-		out, err := m3.GetItem("another key").S.Get(0, uint32(m3.Timestamp(3)), m3.GetStorage())
-		if len(out) != 1 {
-			t.Fatal("length of output is wrong")
-		}
-	*/
+	}
+	if have != 2 {
+		t.Fatal("the number of keys is wrong")
+	}
+	out, err := m3.GetItem("another key").S.Get(0, uint32(m3.Timestamp(3)), m3.GetStorage())
+	if len(out) != 1 {
+		t.Fatal("length of output is wrong")
+	}
 }
 
 func TestPut(t *testing.T) {
@@ -280,7 +278,7 @@ func TestPut(t *testing.T) {
 func TestBucketPutAndGet(t *testing.T) {
 	var shardId int32 = 10
 	PathCreate(shardId)
-	// defer FileDelete()
+	defer FileDelete()
 
 	k := NewKeyListWriter(DataDirectory_Test, 100)
 	b := NewBucketLogWriter(4*SECONDS_PER_HOUR, DataDirectory_Test, 100, 0)

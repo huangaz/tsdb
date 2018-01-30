@@ -2,7 +2,6 @@ package tsdb
 
 import (
 	"testing"
-	"time"
 )
 
 func TestWriteAndRead(t *testing.T) {
@@ -104,7 +103,6 @@ func TestCompact(t *testing.T) {
 			item := KeyItem{int32(i), RandStr(30), 15}
 			i++
 			return item
-			time.Sleep(100 * time.Millisecond)
 		}
 		return KeyItem{0, "", 0}
 	})

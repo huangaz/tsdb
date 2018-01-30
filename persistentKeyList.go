@@ -328,15 +328,6 @@ func (p *PersistentKeyList) Compact(generator func() KeyItem) error {
 		return err
 	}
 
-	var buffer []byte
-	for item := generator(); item.Key != ""; item = generator() {
-		p.appendBuffer(&buffer, item)
-	}
-
-	if len(buffer) == 0 {
-		return nil
-	}
-
 	tmpSlice := []byte{FILE_WITH_CATEGORIES_MARKER}
 	written, err := tmpFile.File.Write(tmpSlice)
 	if err != nil {
@@ -345,6 +336,21 @@ func (p *PersistentKeyList) Compact(generator func() KeyItem) error {
 	if written != 1 {
 		err = fmt.Errorf("Could not write to the key list file %s\n", tmpFile.Name)
 		return err
+	}
+
+	var buffer []byte
+	for item := generator(); item.Key != ""; item = generator() {
+		p.appendBuffer(&buffer, item)
+		if len(buffer) >= SMALL_BUFFER_SIZE {
+			written, err = tmpFile.File.Write(buffer)
+			if err != nil {
+				return err
+			}
+			if written != len(buffer) {
+				return fmt.Errorf("Failed to flush key list file %s\n", tmpFile.Name)
+			}
+			buffer = buffer[:0]
+		}
 	}
 
 	written, err = tmpFile.File.Write(buffer)
