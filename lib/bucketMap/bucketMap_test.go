@@ -21,11 +21,6 @@ var (
 	testString    = make([]string, NUM_OF_KEYS)
 )
 
-type DataPoint struct {
-	key   string
-	value dataTypes.DataPoint
-}
-
 func createString() {
 	for i := range testString {
 		testString[i] = testUtil.RandStr(10)
@@ -37,7 +32,7 @@ func init() {
 }
 
 func testMap(m *BucketMap, t *testing.T) {
-	var dp dataTypes.DataPoint
+	var dp dataTypes.TimeValuePair
 	dp.Value = 100.0
 	dp.Timestamp = m.Timestamp(1)
 
@@ -199,7 +194,6 @@ func TestReload(t *testing.T) {
 	*/
 }
 
-/*
 func TestPut(t *testing.T) {
 	var shardId int64 = 17
 	testUtil.PathCreate(shardId)
@@ -221,7 +215,7 @@ func TestPut(t *testing.T) {
 	}
 
 	m2 := NewBucketMap(6, 4*timeConstants.SECONDS_PER_HOUR, shardId, dataDirectory, k, b, UNOWNED)
-	var dp dataTypes.DataPoint
+	var dp dataTypes.TimeValuePair
 	dp.Value = 100.0
 	dp.Timestamp = m2.Timestamp(1)
 
@@ -289,8 +283,6 @@ func TestPut(t *testing.T) {
 	}
 }
 
-*/
-
 func TestPutAndGet(t *testing.T) {
 	var shardId int64 = 10
 	testUtil.PathCreate(shardId)
@@ -304,22 +296,27 @@ func TestPutAndGet(t *testing.T) {
 	// Fill, then close the BucketMap.
 	m := NewBucketMap(6, 4*timeConstants.SECONDS_PER_HOUR, shardId, dataDirectory, k, b, OWNED)
 
-	testDatas := []DataPoint{
-		{key: "testa", value: dataTypes.DataPoint{Value: 100.0, Timestamp: 60}},
-		{key: "testa", value: dataTypes.DataPoint{Value: 110.0, Timestamp: 118}},
-		{key: "testa", value: dataTypes.DataPoint{Value: 170.0, Timestamp: 183}},
-		{key: "testa", value: dataTypes.DataPoint{Value: 210.0, Timestamp: 247}},
-		{key: "testa", value: dataTypes.DataPoint{Value: 110.0, Timestamp: 300}},
+	testDatas := []dataTypes.DataPoint{
+		{Key: &dataTypes.Key{Key: "testa", ShardId: shardId},
+			Value: &dataTypes.TimeValuePair{Value: 100.0, Timestamp: 60}},
+		{Key: &dataTypes.Key{Key: "testa", ShardId: shardId},
+			Value: &dataTypes.TimeValuePair{Value: 110.0, Timestamp: 118}},
+		{Key: &dataTypes.Key{Key: "testa", ShardId: shardId},
+			Value: &dataTypes.TimeValuePair{Value: 170.0, Timestamp: 183}},
+		{Key: &dataTypes.Key{Key: "testa", ShardId: shardId},
+			Value: &dataTypes.TimeValuePair{Value: 210.0, Timestamp: 247}},
+		{Key: &dataTypes.Key{Key: "testa", ShardId: shardId},
+			Value: &dataTypes.TimeValuePair{Value: 110.0, Timestamp: 300}},
 	}
 
 	for _, testData := range testDatas {
-		_, _, err := m.Put(testData.key, testData.value, 0, false)
+		_, _, err := m.Put(testData.Key.Key, *testData.Value, 0, false)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	_, err := m.FinalizeBuckets(0)
+	_, err := m.FinalizeBuckets(1)
 	if err != nil {
 		t.Fatal(err)
 	}

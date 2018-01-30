@@ -53,7 +53,7 @@ func TestThreadWrite(t *testing.T) {
 	var (
 		shardId    int64  = 23
 		windowSize uint64 = 100
-		unixTime          = bucketUtils.FloorTimestamp(5000, windowSize, shardId)
+		unixTime          = bucketUtils.FloorTimestamp(5000, windowSize)
 		ts1               = unixTime + 1
 		ts2               = unixTime + int64(windowSize) - 1
 		ts3               = unixTime + int64(windowSize)
@@ -128,7 +128,7 @@ func readSingleValueFromLog(fileUtils fileUtils.FileUtils, shardId int64, expect
 	if f.File == nil {
 		// The file has been opened in advanced with the bucket starting
 		// time file name.
-		baseTime = bucketUtils.FloorTimestamp(expectedUnixTime, windowSize, shardId)
+		baseTime = bucketUtils.FloorTimestamp(expectedUnixTime, windowSize)
 		f, err = fileUtils.Open(int(baseTime), "r")
 	}
 	if err != nil {

@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/huangaz/tsdb/lib/dataBlockReader"
@@ -412,8 +413,8 @@ func (b *BucketStorage) FinalizeBucket(position uint32) (err error) {
 
 	if ptr[bucket].finalized == true {
 		ptr[bucket].pagesMutex.Unlock()
-		errString := fmt.Sprintf("This bucket has already been finalized: %d", position)
-		return fmt.Errorf(errString)
+		log.Printf("This bucket has already been finalized: %d", position)
+		return nil
 	}
 
 	pages := ptr[bucket].pages

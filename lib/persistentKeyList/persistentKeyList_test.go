@@ -2,6 +2,7 @@ package persistentKeyList
 
 import (
 	"testing"
+	"time"
 
 	"github.com/huangaz/tsdb/lib/testUtil"
 )
@@ -93,4 +94,24 @@ func TestWriteAndRead(t *testing.T) {
 		t.Fatal("wrong data!")
 	}
 
+}
+
+func TestCompact(t *testing.T) {
+	var shardId int64 = 27
+	testUtil.PathCreate(shardId)
+	// defer testUtil.FileDelete()
+
+	keys := NewPersistentKeyList(shardId, dataDirectory)
+
+	// Rewrite two keys.
+	i := 0
+	keys.Compact(func() KeyItem {
+		if i < 20000 {
+			item := KeyItem{int32(i), testUtil.RandStr(30), 15}
+			i++
+			return item
+			time.Sleep(100 * time.Millisecond)
+		}
+		return KeyItem{0, "", 0}
+	})
 }

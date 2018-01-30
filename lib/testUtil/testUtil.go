@@ -23,7 +23,7 @@ var (
 	ShardDirectory_Test = DataDirectory_Test + "/1"
 )
 
-var TestData = []dataTypes.DataPoint{
+var TestData = []dataTypes.TimeValuePair{
 	{761, 1440583200}, {727, 1440583261}, {765, 1440583322}, {706, 1440583378}, {700, 1440583440},
 	{679, 1440583500}, {757, 1440583560}, {708, 1440583620}, {739, 1440583680}, {707, 1440583740},
 	{699, 1440583800}, {740, 1440583860}, {729, 1440583920}, {766, 1440583980}, {730, 1440584040},
@@ -133,7 +133,7 @@ func RandStr(length int) string {
 
 func DataGenerator(numOfKeys, num int) *dataTypes.PutRequest {
 	req := &dataTypes.PutRequest{}
-	req.Datas = make([]*dataTypes.Data, num*numOfKeys)
+	req.Data = make([]*dataTypes.DataPoint, num*numOfKeys)
 	index := 0
 
 	for i := 0; i < numOfKeys; i++ {
@@ -142,13 +142,17 @@ func DataGenerator(numOfKeys, num int) *dataTypes.PutRequest {
 
 		for j := 0; j < num; j++ {
 			testTime += (55 + rand.Intn(10))
-			newData := &dataTypes.Data{
-				Key:     testKey,
-				ShardId: int64(i + 1),
-				DataPoint: dataTypes.DataPoint{Timestamp: int64(testTime),
-					Value: float64(100 + rand.Intn(50))},
+			newData := &dataTypes.DataPoint{
+				Key: &dataTypes.Key{
+					Key:     testKey,
+					ShardId: int64(i + 1),
+				},
+				Value: &dataTypes.TimeValuePair{
+					Timestamp: int64(testTime),
+					Value:     float64(100 + rand.Intn(50)),
+				},
 			}
-			req.Datas[index] = newData
+			req.Data[index] = newData
 			index++
 		}
 	}

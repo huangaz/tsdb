@@ -1,9 +1,11 @@
 package bucketUtils
 
-import (
-	"github.com/huangaz/tsdb/lib/dataTypes"
-)
+// Conversions from timestamp to bucket number.
+func Bucket(unixTime int64, windowSize uint64) uint32 {
+	return uint32(unixTime/int64(windowSize) + 1)
+}
 
+/*
 // Conversions from timestamp to bucket number.
 func Bucket(unixTime int64, windowSize uint64, shardId int64) uint32 {
 	if unixTime < shardId*int64(windowSize)/dataTypes.GORILLA_SHARDS {
@@ -13,9 +15,16 @@ func Bucket(unixTime int64, windowSize uint64, shardId int64) uint32 {
 	return uint32((unixTime - (shardId * int64(windowSize) / dataTypes.GORILLA_SHARDS)) / int64(windowSize))
 }
 
+
 // Conversions from bucket number to timestamp.
 func Timestamp(bucket uint32, windowSize uint64, shardId int64) int64 {
 	return int64(bucket)*int64(windowSize) + (shardId * int64(windowSize) / dataTypes.GORILLA_SHARDS)
+}
+*/
+
+// Conversions from bucket number to timestamp.
+func Timestamp(bucket uint32, windowSize uint64) int64 {
+	return int64(uint64(bucket-1) * windowSize)
 }
 
 // Conversions from duration to number of buckets.
@@ -29,6 +38,6 @@ func Duration(buckets uint32, windowSize uint64) uint64 {
 }
 
 // Gets the timestamp of the bucket the original timestamp is in.
-func FloorTimestamp(unixTime int64, windowSize uint64, shardId int64) int64 {
-	return Timestamp(Bucket(unixTime, windowSize, shardId), windowSize, shardId)
+func FloorTimestamp(unixTime int64, windowSize uint64) int64 {
+	return Timestamp(Bucket(unixTime, windowSize), windowSize)
 }

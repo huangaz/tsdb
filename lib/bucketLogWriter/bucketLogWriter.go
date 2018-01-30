@@ -130,12 +130,22 @@ func (b *BucketLogWriter) stopWriterThread() {
 	b.threadIsRuning = false
 }
 
+/*
 func (b *BucketLogWriter) bucket(unixTime, shardId int64) uint32 {
 	return bucketUtils.Bucket(unixTime, b.windowSize_, shardId)
 }
 
 func (b *BucketLogWriter) timestamp(bucket uint32, shardId int64) int64 {
 	return bucketUtils.Timestamp(bucket, b.windowSize_, shardId)
+}
+*/
+
+func (b *BucketLogWriter) bucket(unixTime int64) uint32 {
+	return bucketUtils.Bucket(unixTime, b.windowSize_)
+}
+
+func (b *BucketLogWriter) timestamp(bucket uint32) int64 {
+	return bucketUtils.Timestamp(bucket, b.windowSize_)
 }
 
 func (b *BucketLogWriter) duration(buckets uint32) uint64 {
@@ -188,7 +198,7 @@ func (b *BucketLogWriter) writeOneLogEntry() bool {
 			// Select the next clear time to be the start of a bucket between
 			// windowSize_ and windowSize_ * 2 to spread out the clear operations.
 			writer.nextClearTimeSecs = bucketUtils.FloorTimestamp(time.Now().Unix()+
-				int64(b.duration(2)), b.windowSize_, info.shardId)
+				int64(b.duration(2)), b.windowSize_)
 
 			writer.fileUtils = fileUtils.NewFileUtils(info.shardId, LogFilePrefix,
 				b.dataDirectory_)
@@ -212,7 +222,7 @@ func (b *BucketLogWriter) writeOneLogEntry() bool {
 				continue
 			}
 
-			bucketNum := int(b.bucket(info.unixTime, info.shardId))
+			bucketNum := int(b.bucket(info.unixTime))
 			logWriter := sw.logWriters[bucketNum]
 
 			// Create a new DataLogWriter and a new file.
@@ -234,12 +244,12 @@ func (b *BucketLogWriter) writeOneLogEntry() bool {
 			sw.logWriters[bucketNum] = logWriter
 
 			// Open files for the next bucket in the last 1/10 of the time window.
-			openNextFileTime := b.timestamp(uint32(bucketNum), info.shardId) +
+			openNextFileTime := b.timestamp(uint32(bucketNum)) +
 				int64(float64(b.windowSize_)*0.9)
 			_, ok = sw.logWriters[bucketNum+1]
 			if time.Now().Unix() > openNextFileTime && !ok {
 				// Create a new DataLogWriter and a new file for next bucket.
-				baseTime := b.timestamp(uint32(bucketNum+1), info.shardId)
+				baseTime := b.timestamp(uint32(bucketNum + 1))
 				for i := 0; i < FILE_OPEN_RETRY; i++ {
 					f, err := sw.fileUtils.Open(int(baseTime), "wc")
 					if err == nil && f.File != nil {
@@ -263,8 +273,8 @@ func (b *BucketLogWriter) writeOneLogEntry() bool {
 			_, ok = sw.logWriters[bucketNum-1]
 			var onePreviousLogWriterCleared bool = false
 
-			if !onePreviousLogWriterCleared && now-bucketUtils.FloorTimestamp(now, b.windowSize_,
-				info.shardId) > int64(b.waitTimeBeforeClosing_) && !ok {
+			if !onePreviousLogWriterCleared && now-bucketUtils.FloorTimestamp(now, b.windowSize_) >
+				int64(b.waitTimeBeforeClosing_) && !ok {
 				delete(sw.logWriters, bucketNum-1)
 				onePreviousLogWriterCleared = true
 			}

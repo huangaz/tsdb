@@ -174,7 +174,7 @@ func NewItem(key string) *Item {
 // Returns the number of new rows created (0 or 1) and the number of
 // data points successfully inserted (0 or 1).
 // Returns {kNotOwned,kNotOwned} if this map is currenly not owned.
-func (b *BucketMap) Put(key string, value dataTypes.DataPoint, category uint16,
+func (b *BucketMap) Put(key string, value dataTypes.TimeValuePair, category uint16,
 	skipStateCheck bool) (newRows, dataPoints int, err error) {
 
 	if key == "" {
@@ -315,7 +315,7 @@ func (b *BucketMap) getInternal(key string) (*Item, uint32) {
 	return nil, 0
 }
 
-func (b *BucketMap) queueDataPointWithKey(key string, value dataTypes.DataPoint, category uint16) {
+func (b *BucketMap) queueDataPointWithKey(key string, value dataTypes.TimeValuePair, category uint16) {
 	if key == "" {
 		log.Println("Not queueing with empty key")
 		return
@@ -330,7 +330,7 @@ func (b *BucketMap) queueDataPointWithKey(key string, value dataTypes.DataPoint,
 	b.queueDataPoint(dp)
 }
 
-func (b *BucketMap) queueDataPointWithId(id uint32, value dataTypes.DataPoint, category uint16) {
+func (b *BucketMap) queueDataPointWithId(id uint32, value dataTypes.TimeValuePair, category uint16) {
 	var dp QueueDataPoint
 
 	// Leave key string empty to indicate that timeSeriesId is used.
@@ -343,7 +343,7 @@ func (b *BucketMap) queueDataPointWithId(id uint32, value dataTypes.DataPoint, c
 }
 
 func (b *BucketMap) putDataPointWithId(timeSeries *bucketedTimeSeries.BucketedTimeSeries,
-	timeSeriesId uint32, value dataTypes.DataPoint, category uint16) bool {
+	timeSeriesId uint32, value dataTypes.TimeValuePair, category uint16) bool {
 
 	bucketNum := b.Bucket(value.Timestamp)
 
@@ -368,7 +368,7 @@ func (b *BucketMap) GetItem(key string) *Item {
 	return item
 }
 
-func (b *BucketMap) Get(key string, begin, end int64) (res []dataTypes.DataPoint, err error) {
+func (b *BucketMap) Get(key string, begin, end int64) (res []dataTypes.TimeValuePair, err error) {
 
 	item := b.GetItem(key)
 	if item == nil {
@@ -438,12 +438,22 @@ func (b *BucketMap) Erase(index uint32, item *Item) {
 }
 
 func (b *BucketMap) Bucket(unixTime int64) uint32 {
+	return bucketUtils.Bucket(unixTime, b.windowSize_)
+}
+
+func (b *BucketMap) Timestamp(bucket uint32) int64 {
+	return bucketUtils.Timestamp(bucket, b.windowSize_)
+}
+
+/*
+func (b *BucketMap) Bucket(unixTime int64) uint32 {
 	return bucketUtils.Bucket(unixTime, b.windowSize_, b.shardId_)
 }
 
 func (b *BucketMap) Timestamp(bucket uint32) int64 {
 	return bucketUtils.Timestamp(bucket, b.windowSize_, b.shardId_)
 }
+*/
 
 func (b *BucketMap) duration(buckets uint32) uint64 {
 	return bucketUtils.Duration(buckets, b.windowSize_)
@@ -720,7 +730,7 @@ func (b *BucketMap) readLogFiles(lastBlock uint32) error {
 			defer b.rwLock_.RUnlock()
 
 			if index < uint32(len(b.rows_)) && b.rows_[index] != nil {
-				var dp dataTypes.DataPoint
+				var dp dataTypes.TimeValuePair
 				dp.Timestamp = unixTime
 				dp.Value = value
 				b.rows_[index].S.Put(b.Bucket(unixTime), index, dp, b.storage_, nil)
@@ -774,7 +784,7 @@ func (b *BucketMap) processQueueDataPoints(skipStateCheck bool) {
 	}
 
 	for _, dp := range dps {
-		var value dataTypes.DataPoint
+		var value dataTypes.TimeValuePair
 		value.Timestamp = dp.unixTime
 		value.Value = dp.value
 
@@ -866,8 +876,6 @@ func (b *BucketMap) CancelUnowning() bool {
 // If the shard is not owned, will return immediately with 0.
 func (b *BucketMap) FinalizeBuckets(lastBucketToFinalize uint32) (int, error) {
 
-	log.Printf("lastBucketToFinalize: %d,b.lastFinalizedBucket_: %d", lastBucketToFinalize, b.lastFinalizedBucket_)
-
 	if b.GetState() != OWNED {
 		log.Println("not owned!")
 		return 0, nil
@@ -880,7 +888,7 @@ func (b *BucketMap) FinalizeBuckets(lastBucketToFinalize uint32) (int, error) {
 		bucketToFinalize = b.lastFinalizedBucket_ + 1
 	}
 
-	if bucketToFinalize <= b.lastFinalizedBucket_ || bucketToFinalize > lastBucketToFinalize {
+	if bucketToFinalize < b.lastFinalizedBucket_ || bucketToFinalize > lastBucketToFinalize {
 		return 0, nil
 	}
 
@@ -889,8 +897,6 @@ func (b *BucketMap) FinalizeBuckets(lastBucketToFinalize uint32) (int, error) {
 	bucketsToFinalize := lastBucketToFinalize - bucketToFinalize + 1
 	items := b.GetEverything()
 	for bucket := bucketToFinalize; bucket <= lastBucketToFinalize; bucket++ {
-
-		log.Println("Attempt to finalize bucket :", bucket)
 
 		for i, item := range items {
 			if item != nil {

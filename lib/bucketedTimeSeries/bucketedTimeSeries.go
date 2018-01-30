@@ -102,7 +102,7 @@ func (b *BucketedTimeSeries) open(next, timeSeriesId uint32,
 // If category pointer is defined, sets the category.
 // `i`: the number of bucket to store data
 // `dp`: data point to be stored
-func (b *BucketedTimeSeries) Put(i, timeSeriesId uint32, dp dataTypes.DataPoint,
+func (b *BucketedTimeSeries) Put(i, timeSeriesId uint32, dp dataTypes.TimeValuePair,
 	storage *bucketStorage.BucketStorage, category *uint16) (err error) {
 
 	b.lock_.Lock()

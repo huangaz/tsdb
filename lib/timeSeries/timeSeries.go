@@ -6,7 +6,7 @@ import (
 )
 
 // Build a TimeSeriesBlock from the given data points.
-func WriteValues(dps []dataTypes.DataPoint) (block dataTypes.TimeSeriesBlock) {
+func WriteValues(dps []dataTypes.TimeValuePair) (block dataTypes.TimeSeriesBlock) {
 	s := timeSeriesStream.NewSeries(nil)
 
 	for _, dp := range dps {

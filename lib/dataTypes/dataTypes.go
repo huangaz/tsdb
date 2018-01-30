@@ -22,15 +22,24 @@ const (
 	GORILLA_SHARDS = 100
 )
 
-type Data struct {
+type Key struct {
 	Key     string
 	ShardId int64
-	DataPoint
+}
+
+type TimeValuePair struct {
+	Value     float64
+	Timestamp int64
 }
 
 type DataPoint struct {
-	Value     float64
-	Timestamp int64
+	Key   *Key
+	Value *TimeValuePair
+}
+
+type DataPoints struct {
+	Key    *Key
+	Values []*TimeValuePair
 }
 
 type DataBlock struct {
@@ -43,7 +52,7 @@ type TimeSeriesBlock struct {
 }
 
 type PutRequest struct {
-	Datas []*Data
+	Data []*DataPoint
 }
 
 type PutResponse struct {
@@ -51,23 +60,21 @@ type PutResponse struct {
 }
 
 type GetRequest struct {
-	Begin   int64
-	End     int64
-	Key     string
-	ShardId int64
+	Keys  []*Key
+	Begin int64
+	End   int64
 }
 
 type GetResponse struct {
-	Key string
-	Dps []*DataPoint
+	Data []*DataPoints
 }
 
 func (p *PutRequest) String() string {
 	var res string
 	res += fmt.Sprintf("--PutRequest--\n")
-	for _, data := range p.Datas {
-		res += fmt.Sprintf("%4s%20s%10s%3d%8s%5d%8s%15f\n", "key:", data.Key,
-			"shardId:", data.ShardId, "time:", data.Timestamp, "value:", data.Value)
+	for _, dp := range p.Data {
+		res += fmt.Sprintf("%4s%20s%10s%3d%8s%5d%8s%15f\n", "key:", dp.Key.Key,
+			"shardId:", dp.Key.ShardId, "time:", dp.Value.Timestamp, "value:", dp.Value.Value)
 	}
 	return res
 }
@@ -75,9 +82,12 @@ func (p *PutRequest) String() string {
 func (g *GetResponse) String() string {
 	var res string
 	res += fmt.Sprintf("--GetResponse--\n")
-	res += fmt.Sprintf("key: %s\n", g.Key)
-	for _, dp := range g.Dps {
-		res += fmt.Sprintf("%10s%5d%8s%10f\n", "timestamp:", dp.Timestamp, "value:", dp.Value)
+	for _, dp := range g.Data {
+		res += fmt.Sprintf("key: %s\n", dp.Key.Key)
+		for _, v := range dp.Values {
+			res += fmt.Sprintf("%10s%5d%8s%10f\n", "timestamp:", v.Timestamp, "value:", v.Value)
+		}
+
 	}
 	return res
 }
