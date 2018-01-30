@@ -1,0 +1,23 @@
+syntax = "proto3";
+option go_package = "github.com/yubo/falcon/lib/tsdb";
+package tsdb;
+
+message Key {
+	bytes    key       = 1;
+	int32    shardId   = 2;
+}
+
+message TimeValuePair {
+	int64  timestamp = 1;
+	double value     = 2;
+}
+
+message DataPoint {
+	Key           key   = 1;
+	TimeValuePair value = 2; 
+}
+
+message DataPoints {
+	Key                    key = 1;
+	repeated TimeValuePair values = 2; 
+}
