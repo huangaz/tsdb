@@ -47,6 +47,10 @@ var (
 	KeyFilePrefix = KEY_FILE_PREFIX
 )
 
+func (k *KeyItem) String() string {
+	return fmt.Sprintf("Id: %d, Key: %s, Category: %d\n", k.Id, k.Key, k.Category)
+}
+
 func NewPersistentKeyList(shardId int32, dataDirectory string) *PersistentKeyList {
 	res := &PersistentKeyList{
 		activeList_: File{File: nil, Name: ""},

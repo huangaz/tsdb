@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	NUM_OF_KEYS = 1000
+	NUM_OF_KEYS = 10
 )
 
 var (
@@ -75,7 +75,7 @@ func testReads(m *BucketMap, t *testing.T) {
 
 /*
 func TestTimeSeries(t *testing.T) {
-	var shardId int64 = 100
+	var shardId int32 = 100
 	PathCreate(shardId)
 	// defer FileDelete()
 
@@ -93,7 +93,7 @@ func TestReload(t *testing.T) {
 	var shardId int32 = 4
 	var DataDirectory_Test = DataDirectory_Test
 	PathCreate(shardId)
-	defer FileDelete()
+	// defer FileDelete()
 
 	k := NewKeyListWriter(DataDirectory_Test, 100)
 	b := NewBucketLogWriter(4*SECONDS_PER_HOUR, DataDirectory_Test, 100, 0)
@@ -143,47 +143,51 @@ func TestReload(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Read it all again.
-	// This time, insert a point before reading blocks. This point should not have
-	// older data.
-	m3 := NewBucketMap(6, 4*SECONDS_PER_HOUR, shardId, DataDirectory_Test, k, b, OWNED)
-	if err := m3.SetState(PRE_UNOWNED); err != nil {
-		t.Fatal(err)
-	}
-	if err := m3.SetState(UNOWNED); err != nil {
-		t.Fatal(err)
-	}
-	if err := m3.ReadKeyList(); err != nil {
-		t.Fatal(err)
-	}
-	if err := m3.ReadData(); err != nil {
-		t.Fatal(err)
-	}
-	// Add a point. This will get assigned an ID that still has block
-	// data on disk.
-	var v TimeValuePair
-	v.Value = 100.0
-	v.Timestamp = m3.Timestamp(2)
-	if _, _, err := m3.Put("another key", v, 0, false); err != nil {
-		t.Fatal(err)
-	}
-	for more, _ := m3.ReadBlockFiles(); more; more, _ = m3.ReadBlockFiles() {
-	}
+	/*
 
-	everything := m3.GetEverything()
-	var have int = 0
-	for _, thing := range everything {
-		if thing != nil {
-			have++
+		// Read it all again.
+		// This time, insert a point before reading blocks. This point should not have
+		// older data.
+		m3 := NewBucketMap(6, 4*SECONDS_PER_HOUR, shardId, DataDirectory_Test, k, b, OWNED)
+		if err := m3.SetState(PRE_UNOWNED); err != nil {
+			t.Fatal(err)
 		}
-	}
-	if have != 2 {
-		t.Fatal("the number of keys is wrong")
-	}
-	out, err := m3.GetItem("another key").S.Get(0, uint32(m3.Timestamp(3)), m3.GetStorage())
-	if len(out) != 1 {
-		t.Fatal("length of output is wrong")
-	}
+		if err := m3.SetState(UNOWNED); err != nil {
+			t.Fatal(err)
+		}
+		if err := m3.ReadKeyList(); err != nil {
+			t.Fatal(err)
+		}
+		if err := m3.ReadData(); err != nil {
+			t.Fatal(err)
+		}
+		// Add a point. This will get assigned an ID that still has block
+		// data on disk.
+		var v TimeValuePair
+		v.Value = 100.0
+		v.Timestamp = m3.Timestamp(2)
+		if _, _, err := m3.Put("another key", v, 0, false); err != nil {
+			t.Fatal(err)
+		}
+		for more, _ := m3.ReadBlockFiles(); more; more, _ = m3.ReadBlockFiles() {
+		}
+
+		everything := m3.GetEverything()
+		var have int = 0
+		for _, thing := range everything {
+			if thing != nil {
+				have++
+			}
+		}
+		if have != 2 {
+			t.Fatal("the number of keys is wrong")
+		}
+		out, err := m3.GetItem("another key").S.Get(0, uint32(m3.Timestamp(3)), m3.GetStorage())
+		if len(out) != 1 {
+			t.Fatal("length of output is wrong")
+		}
+
+	*/
 }
 
 func TestPut(t *testing.T) {
@@ -320,4 +324,61 @@ func TestBucketPutAndGet(t *testing.T) {
 	}
 
 	fmt.Println(res)
+}
+
+func TestCompactKeyList(t *testing.T) {
+	var shardId int32 = 121
+	PathCreate(shardId)
+	// defer FileDelete()
+
+	k := NewKeyListWriter(DataDirectory_Test, 100)
+	b := NewBucketLogWriter(4*SECONDS_PER_HOUR, DataDirectory_Test, 100, 0)
+	k.StartShard(shardId)
+	b.StartShard(shardId)
+
+	m := NewBucketMap(6, 4*SECONDS_PER_HOUR, shardId, DataDirectory_Test, k, b, OWNED)
+
+	var v TimeValuePair
+	v.Value = 100.0
+	v.Timestamp = m.Timestamp(1)
+	key1 := "Key1"
+
+	_, _, err := m.Put(key1, v, 0, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(100 * time.Millisecond)
+
+	v.Value += 10.0
+	v.Timestamp += 60
+	key2 := "Key2"
+
+	_, _, err = m.Put(key2, v, 0, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(100 * time.Millisecond)
+
+	var keyItems []KeyItem
+	ReadKeys(shardId, DataDirectory_Test, func(item KeyItem) bool {
+		keyItems = append(keyItems, item)
+		return true
+	})
+	if len(keyItems) != 2 || keyItems[0].Key != "Key1" || keyItems[1].Key != "Key2" {
+		t.Fatal("sth wrong with key_list")
+	}
+
+	items := m.GetEverything()
+	m.Erase(0, items[0])
+
+	m.CompactKeyList()
+
+	var newKeyItems []KeyItem
+	ReadKeys(shardId, DataDirectory_Test, func(item KeyItem) bool {
+		newKeyItems = append(newKeyItems, item)
+		return true
+	})
+	if len(newKeyItems) != 1 || newKeyItems[0].Key != "Key2" {
+		t.Fatal("CompactKeyList wrong")
+	}
 }

@@ -456,10 +456,11 @@ func (b *BucketMap) GetStorage() *BucketStorage {
 func (b *BucketMap) CompactKeyList() {
 	items := b.GetEverything()
 
+	i := -1
 	b.keyWriter_.Compact(b.shardId_, func() KeyItem {
-		for i, item := range items {
-			if item != nil {
-				keyItem := KeyItem{int32(i), item.Key, item.S.GetCategory()}
+		for i++; i < len(items); i++ {
+			if items[i] != nil {
+				keyItem := KeyItem{int32(i), items[i].Key, items[i].S.GetCategory()}
 				return keyItem
 			}
 		}
