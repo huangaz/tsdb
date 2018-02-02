@@ -23,7 +23,7 @@ func NewDataBlockReader(shardId int32, dataDiretory string) *DataBlockReader {
 
 // Returns allocated blocks for every page with the given id. Fills in
 // timeSeriesIds and storageIds with the metadata associated with the blocks.
-func (d *DataBlockReader) ReadBlocks(id uint32) (pointers [](*DataBlock),
+func (d *DataBlockReader) ReadBlocks(id uint32) (pointers []*DataBlock,
 	timeSeriesIds []uint32, storageIds []uint64, err error) {
 
 	f, err := d.dataFiles_.Open(int(id), "r")

@@ -150,7 +150,7 @@ func TestOpen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer testFileHandle.Close(res)
+	defer testFileHandle.Close(&res)
 	if res.File.Name() != testFileHandle.filePath(1) {
 		t.Fatalf("Wrong filePath! Want %s, get %s\n", testFileHandle.filePath(1), res.File.Name())
 	}

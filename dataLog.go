@@ -72,9 +72,6 @@ type DataLogWriter struct {
 	previousvalues_ []float64
 }
 
-type DataLogReader struct {
-}
-
 // Initialize a DataLogWriter which will append data to the given file.
 func NewDataLogWriter(out *File, baseTime int64) *DataLogWriter {
 	res := &DataLogWriter{

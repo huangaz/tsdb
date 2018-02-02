@@ -14,6 +14,10 @@ const (
 	DATA_BLOCK_SIZE = 65536
 	PAGE_SIZE       = DATA_BLOCK_SIZE
 	DATA_PRE_FIX    = "block_data"
+
+	// These files are only used as marker files to indicate which
+	// blocks have been completed. The files are empty but the file name
+	// has the id of the completed block.
 	COMPLETE_PREFIX = "complete_block"
 	LOG_FILE_PREFIX = "log"
 	KEY_FILE_PREFIX = "key_list"

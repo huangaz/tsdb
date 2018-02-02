@@ -64,12 +64,14 @@ const (
 )
 
 type BucketMap struct {
+	lock_             sync.RWMutex
+	stateChangeMutex_ sync.Mutex
+
 	n_                     uint8
 	windowSize_            uint64
 	reliableDataStartTime_ int64
 
-	rwLock_ sync.RWMutex
-	map_    map[string]uint32
+	map_ map[string]uint32
 
 	// Always equal to rows_.size()
 	tableSize_ uint32
@@ -87,16 +89,10 @@ type BucketMap struct {
 	logWriter_ *BucketLogWriter
 	addTimer_  Timer
 
-	mutex_ sync.Mutex
-
-	// stateChangeMutex_ sync.Mutex
-
 	QueueDataPoint
 
-	dataPointQueue_      chan QueueDataPoint
+	dataPointQueue_      chan *QueueDataPoint
 	lastFinalizedBucket_ uint32
-
-	// unreadBlockFilesMutex_ sync.Mutex
 
 	// set
 	unreadBlockFiles_ []int
@@ -109,14 +105,14 @@ type BucketMap struct {
 }
 
 type QueueDataPoint struct {
-	timeSeriesId uint32
+	TimeSeriesId uint32
 
-	unixTime int64
+	UnixTime int64
 
 	// Empty string will indicate that timeSeriesId is used.
-	key      string
-	value    float64
-	category uint16
+	Key      string
+	Value    float64
+	Category uint16
 }
 
 type Item struct {
@@ -143,7 +139,7 @@ func NewBucketMap(buckets uint8, windowSize uint64, shardId int32, dataDirectory
 		lastFinalizedBucket_: 0,
 
 		freeList_:       NewPriorityQueue(),
-		dataPointQueue_: make(chan QueueDataPoint, DATA_POINT_QUEUE_SIZE),
+		dataPointQueue_: make(chan *QueueDataPoint, DATA_POINT_QUEUE_SIZE),
 	}
 	return res
 }
@@ -160,7 +156,7 @@ func NewItem(key string) *Item {
 // Returns the number of new rows created (0 or 1) and the number of
 // data points successfully inserted (0 or 1).
 // Returns {kNotOwned,kNotOwned} if this map is currenly not owned.
-func (b *BucketMap) Put(key string, value TimeValuePair, category uint16,
+func (b *BucketMap) Put(key string, value *TimeValuePair, category uint16,
 	skipStateCheck bool) (newRows, dataPoints int, err error) {
 
 	if key == "" {
@@ -221,8 +217,8 @@ func (b *BucketMap) Put(key string, value TimeValuePair, category uint16,
 	var index int = 0
 
 	// Lock the map
-	b.rwLock_.Lock()
-	defer b.rwLock_.Unlock()
+	b.lock_.Lock()
+	defer b.lock_.Unlock()
 
 	// Nothing was inserted, just update the existing one.
 	if timeSeriesId, ok := b.map_[key]; ok {
@@ -285,8 +281,8 @@ func StateString(state int) string {
 // Returns a ptr to the item if found.
 // Return `id` if item is found.
 func (b *BucketMap) getInternal(key string) (*Item, uint32) {
-	b.rwLock_.RLock()
-	defer b.rwLock_.RUnlock()
+	b.lock_.RLock()
+	defer b.lock_.RUnlock()
 
 	// Either the state is UNOWNED or keys are being read. In both
 	// cases do not try to find the key.
@@ -301,35 +297,37 @@ func (b *BucketMap) getInternal(key string) (*Item, uint32) {
 	return nil, 0
 }
 
-func (b *BucketMap) queueDataPointWithKey(key string, value TimeValuePair, category uint16) {
+func (b *BucketMap) queueDataPointWithKey(key string, value *TimeValuePair, category uint16) {
 	if key == "" {
 		log.Println("Not queueing with empty key")
 		return
 	}
 
-	var dp QueueDataPoint
-	dp.key = key
-	dp.unixTime = value.Timestamp
-	dp.value = value.Value
-	dp.category = category
+	dp := &QueueDataPoint{
+		Key:      key,
+		UnixTime: value.Timestamp,
+		Value:    value.Value,
+		Category: category,
+	}
 
 	b.queueDataPoint(dp)
 }
 
-func (b *BucketMap) queueDataPointWithId(id uint32, value TimeValuePair, category uint16) {
-	var dp QueueDataPoint
+func (b *BucketMap) queueDataPointWithId(id uint32, value *TimeValuePair, category uint16) {
 
 	// Leave key string empty to indicate that timeSeriesId is used.
-	dp.timeSeriesId = id
-	dp.unixTime = value.Timestamp
-	dp.value = value.Value
-	dp.category = category
+	dp := &QueueDataPoint{
+		TimeSeriesId: id,
+		UnixTime:     value.Timestamp,
+		Value:        value.Value,
+		Category:     category,
+	}
 
 	b.queueDataPoint(dp)
 }
 
 func (b *BucketMap) putDataPointWithId(timeSeries *BucketedTimeSeries,
-	timeSeriesId uint32, value TimeValuePair, category uint16) bool {
+	timeSeriesId uint32, value *TimeValuePair, category uint16) bool {
 
 	bucketNum := b.Bucket(value.Timestamp)
 
@@ -343,7 +341,7 @@ func (b *BucketMap) putDataPointWithId(timeSeries *BucketedTimeSeries,
 	return true
 }
 
-func (b *BucketMap) queueDataPoint(dp QueueDataPoint) {
+func (b *BucketMap) queueDataPoint(dp *QueueDataPoint) {
 	b.dataPointQueue_ <- dp
 	b.reliableDataStartTime_ = time.Now().Unix()
 }
@@ -354,7 +352,7 @@ func (b *BucketMap) GetItem(key string) *Item {
 	return item
 }
 
-func (b *BucketMap) Get(key string, begin, end int64) (res []TimeValuePair, err error) {
+func (b *BucketMap) Get(key string, begin, end int64) (res []*TimeValuePair, err error) {
 
 	item := b.GetItem(key)
 	if item == nil {
@@ -381,8 +379,8 @@ func (b *BucketMap) Get(key string, begin, end int64) (res []TimeValuePair, err 
 
 // Get all the TimeSeries.
 func (b *BucketMap) GetEverything() []*Item {
-	b.rwLock_.RLock()
-	defer b.rwLock_.RUnlock()
+	b.lock_.RLock()
+	defer b.lock_.RUnlock()
 	res := make([]*Item, len(b.rows_))
 	copy(res, b.rows_)
 	return res
@@ -390,8 +388,8 @@ func (b *BucketMap) GetEverything() []*Item {
 
 // Get some of the TimeSeries. Returns true if there is more data left.
 func (b *BucketMap) GetSome(offset, count int) ([]*Item, bool) {
-	b.rwLock_.RLock()
-	defer b.rwLock_.RUnlock()
+	b.lock_.RLock()
+	defer b.lock_.RUnlock()
 
 	if offset >= len(b.rows_) {
 		return nil, false
@@ -407,8 +405,8 @@ func (b *BucketMap) GetSome(offset, count int) ([]*Item, bool) {
 }
 
 func (b *BucketMap) Erase(index uint32, item *Item) {
-	b.rwLock_.Lock()
-	defer b.rwLock_.Unlock()
+	b.lock_.Lock()
+	defer b.lock_.Unlock()
 
 	if item == nil || b.rows_[index] != item {
 		return
@@ -457,14 +455,14 @@ func (b *BucketMap) CompactKeyList() {
 	items := b.GetEverything()
 
 	i := -1
-	b.keyWriter_.Compact(b.shardId_, func() KeyItem {
+	b.keyWriter_.Compact(b.shardId_, func() *KeyItem {
 		for i++; i < len(items); i++ {
 			if items[i] != nil {
-				keyItem := KeyItem{int32(i), items[i].Key, items[i].S.GetCategory()}
+				keyItem := &KeyItem{int32(i), items[i].Key, items[i].S.GetCategory()}
 				return keyItem
 			}
 		}
-		return KeyItem{0, "", 0}
+		return &KeyItem{0, "", 0}
 	})
 }
 
@@ -485,7 +483,7 @@ func (b *BucketMap) ReadKeyList() error {
 		return err
 	}
 
-	ReadKeys(b.shardId_, b.dataDirectory_, func(item KeyItem) bool {
+	ReadKeys(b.shardId_, b.dataDirectory_, func(item *KeyItem) bool {
 
 		if len(item.Key) >= MAX_ALLOWED_KEY_LENGTH {
 			log.Printf("Key is too long. Key file is corrupt for shard %d", b.shardId_)
@@ -546,7 +544,7 @@ func (b *BucketMap) SetState(state int) error {
 		return fmt.Errorf("Invalid state!")
 	}
 
-	b.rwLock_.Lock()
+	b.stateChangeMutex_.Lock()
 
 	if !isAllowedStateTransition(b.state_, state) {
 		return fmt.Errorf("Illegal transition of state from %s to %s", StateString(b.state_),
@@ -578,7 +576,7 @@ func (b *BucketMap) SetState(state int) error {
 
 	// oldState := b.state_
 	b.state_ = state
-	b.rwLock_.Unlock()
+	b.stateChangeMutex_.Unlock()
 
 	// Enable/disable storage outside the lock because it might take a
 	// while and the the storage object has its own locking.
@@ -608,11 +606,11 @@ func (b *BucketMap) ReadData() (err error) {
 	reader := NewDataBlockReader(b.shardId_, b.dataDirectory_)
 
 	// find unread block files.
-	b.mutex_.Lock()
+	b.lock_.Lock()
 
 	b.unreadBlockFiles_, err = reader.FindCompletedBlockFiles()
 	if err != nil {
-		b.mutex_.Unlock()
+		b.lock_.Unlock()
 		return err
 	}
 	if l := len(b.unreadBlockFiles_); l > 0 {
@@ -620,7 +618,7 @@ func (b *BucketMap) ReadData() (err error) {
 		b.lastFinalizedBucket_ = uint32(b.unreadBlockFiles_[l-1])
 	}
 
-	b.mutex_.Unlock()
+	b.lock_.Unlock()
 
 	b.readLogFiles(b.lastFinalizedBucket_)
 	if b.GetState() != READING_LOGS {
@@ -713,14 +711,15 @@ func (b *BucketMap) readLogFiles(lastBlock uint32) error {
 				return false
 			}
 
-			b.rwLock_.RLock()
-			defer b.rwLock_.RUnlock()
+			b.lock_.RLock()
+			defer b.lock_.RUnlock()
 
 			if index < uint32(len(b.rows_)) && b.rows_[index] != nil {
-				var dp TimeValuePair
-				dp.Timestamp = unixTime
-				dp.Value = value
-				b.rows_[index].S.Put(b.Bucket(unixTime), index, dp, b.storage_, nil)
+				v := &TimeValuePair{
+					Timestamp: unixTime,
+					Value:     value,
+				}
+				b.rows_[index].S.Put(b.Bucket(unixTime), index, v, b.storage_, nil)
 			} else {
 				unknownKeys++
 			}
@@ -751,13 +750,13 @@ func (b *BucketMap) readLogFiles(lastBlock uint32) error {
 }
 
 func (b *BucketMap) GetState() int {
-	b.rwLock_.RLock()
-	defer b.rwLock_.RUnlock()
+	b.lock_.RLock()
+	defer b.lock_.RUnlock()
 	return b.state_
 }
 
 func (b *BucketMap) processQueueDataPoints(skipStateCheck bool) {
-	var dps []QueueDataPoint
+	var dps []*QueueDataPoint
 
 	if len(b.dataPointQueue_) == 0 {
 		return
@@ -771,33 +770,34 @@ func (b *BucketMap) processQueueDataPoints(skipStateCheck bool) {
 	}
 
 	for _, dp := range dps {
-		var value TimeValuePair
-		value.Timestamp = dp.unixTime
-		value.Value = dp.value
+		value := &TimeValuePair{
+			Timestamp: dp.UnixTime,
+			Value:     dp.Value,
+		}
 
-		if dp.key == "" {
+		if dp.Key == "" {
 			// Time series id is known. It's possbible to take a few
 			// shortcuts to make adding the data point faster.
 
-			b.rwLock_.RLock()
+			b.lock_.RLock()
 
-			if int(dp.timeSeriesId) >= len(b.rows_) {
+			if int(dp.TimeSeriesId) >= len(b.rows_) {
 				log.Println("invalid timeSeriesId!")
-				b.rwLock_.RUnlock()
+				b.lock_.RUnlock()
 				continue
 			}
-			item := b.rows_[dp.timeSeriesId]
+			item := b.rows_[dp.TimeSeriesId]
 			state := b.state_
 
-			b.rwLock_.RUnlock()
+			b.lock_.RUnlock()
 
 			if !skipStateCheck && state != OWNED && state != PRE_UNOWNED {
 				continue
 			}
-			b.putDataPointWithId(item.S, dp.timeSeriesId, value, dp.category)
+			b.putDataPointWithId(item.S, dp.TimeSeriesId, value, dp.Category)
 		} else {
 			// Run these through the normal workflow.
-			b.Put(dp.key, value, dp.category, skipStateCheck)
+			b.Put(dp.Key, value, dp.Category, skipStateCheck)
 		}
 	}
 }
@@ -808,15 +808,15 @@ func (b *BucketMap) processQueueDataPoints(skipStateCheck bool) {
 // should call again later.
 func (b *BucketMap) ReadBlockFiles() (bool, error) {
 
-	b.mutex_.Lock()
+	b.lock_.Lock()
 
 	l := len(b.unreadBlockFiles_)
 	if l == 0 {
 		if err := b.SetState(OWNED); err != nil {
-			b.mutex_.Unlock()
+			b.lock_.Unlock()
 			return false, err
 		}
-		b.mutex_.Unlock()
+		b.lock_.Unlock()
 		return false, nil
 	}
 
@@ -824,7 +824,7 @@ func (b *BucketMap) ReadBlockFiles() (bool, error) {
 	// delete one number from the set
 	b.unreadBlockFiles_ = b.unreadBlockFiles_[:l-1]
 
-	b.mutex_.Unlock()
+	b.lock_.Unlock()
 
 	timeSeriesIds, storageIds, err := b.storage_.LoadPosition(position)
 	if err != nil {
@@ -833,11 +833,11 @@ func (b *BucketMap) ReadBlockFiles() (bool, error) {
 			b.shardId_, position)
 	}
 	for i, id := range timeSeriesIds {
-		b.rwLock_.RLock()
+		b.lock_.RLock()
 		if id < uint32(len(b.rowsFromDisk_)) && b.rowsFromDisk_[id] != nil {
 			b.rows_[id].S.SetDataBlock(position, b.n_, storageIds[i])
 		}
-		b.rwLock_.RUnlock()
+		b.lock_.RUnlock()
 	}
 
 	return true, nil
@@ -847,8 +847,8 @@ func (b *BucketMap) ReadBlockFiles() (bool, error) {
 // PRE_UNOWNED. Returns true if unowning was successful. State will
 // be OWNED after a successful call.
 func (b *BucketMap) CancelUnowning() bool {
-	b.rwLock_.Lock()
-	defer b.rwLock_.Unlock()
+	b.lock_.Lock()
+	defer b.lock_.Unlock()
 
 	if b.state_ != PRE_UNOWNED {
 		return false

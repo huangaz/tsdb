@@ -15,11 +15,10 @@ import (
 )
 
 type PersistentKeyList struct {
-	activeList_ File
-	files_      FileUtils
-	lock_       sync.Mutex
-	shard_      int32
-	// buffer_     string
+	sync.Mutex
+	activeList_            *File
+	files_                 *FileUtils
+	shard_                 int32
 	buffer_                []byte
 	nextHardFlushTimeSecs_ int64
 }
@@ -43,18 +42,14 @@ const (
 	FILE_WITH_CATEGORIES_MARKER = '1'
 )
 
-var (
-	KeyFilePrefix = KEY_FILE_PREFIX
-)
-
 func (k *KeyItem) String() string {
 	return fmt.Sprintf("Id: %d, Key: %s, Category: %d\n", k.Id, k.Key, k.Category)
 }
 
 func NewPersistentKeyList(shardId int32, dataDirectory string) *PersistentKeyList {
 	res := &PersistentKeyList{
-		activeList_: File{File: nil, Name: ""},
-		files_:      *NewFileUtils(shardId, KeyFilePrefix, dataDirectory),
+		activeList_: &File{File: nil, Name: ""},
+		files_:      NewFileUtils(shardId, KEY_FILE_PREFIX, dataDirectory),
 		shard_:      shardId,
 	}
 
@@ -75,8 +70,8 @@ func (p *PersistentKeyList) DeletePersistentKeyList() {
 
 // Prepare a new file for writes. Returns the id of the previous one.
 func (p *PersistentKeyList) openNext() (int64, error) {
-	p.lock_.Lock()
-	defer p.lock_.Unlock()
+	p.Lock()
+	defer p.Unlock()
 
 	if p.activeList_.File != nil {
 		p.activeList_.File.Close()
@@ -95,7 +90,7 @@ func (p *PersistentKeyList) openNext() (int64, error) {
 	}
 
 	for i := 0; i < KEY_FILE_OPEN_RETRY; i++ {
-		p.activeList_, err = p.files_.Open(activeId, "wc")
+		*p.activeList_, err = p.files_.Open(activeId, "wc")
 		if err == nil && p.activeList_.File != nil {
 			break
 		}
@@ -151,9 +146,9 @@ func (p *PersistentKeyList) flush(hardFlush bool) error {
 
 // Call f on each key in the list.
 // The callback should return false if reading should be stopped.
-func ReadKeys(shardId int32, dataDirectory string, f func(KeyItem) bool) (int, error) {
+func ReadKeys(shardId int32, dataDirectory string, f func(*KeyItem) bool) (int, error) {
 
-	files := NewFileUtils(shardId, KeyFilePrefix, dataDirectory)
+	files := NewFileUtils(shardId, KEY_FILE_PREFIX, dataDirectory)
 
 	// Read all the keys from all the relevant files.
 	ids, err := files.Ls()
@@ -202,7 +197,7 @@ func ReadKeys(shardId int32, dataDirectory string, f func(KeyItem) bool) (int, e
 }
 
 func readKeysFromBuffer(buffer []byte, len int, categoryPresent bool,
-	f func(KeyItem) bool) int {
+	f func(*KeyItem) bool) int {
 
 	var keys int = 0
 	// sizeof(id) + sizeof(keyLength)
@@ -217,7 +212,7 @@ func readKeysFromBuffer(buffer []byte, len int, categoryPresent bool,
 	endIndex := len - minRecordLength
 	var defaultCategory uint16 = 0
 	for index := 0; index <= endIndex; {
-		item := KeyItem{Category: defaultCategory}
+		item := &KeyItem{Category: defaultCategory}
 
 		// read "id" from buffer
 		item.Id = int32(binary.BigEndian.Uint32(buffer[index : index+4]))
@@ -254,9 +249,9 @@ func readKeysFromBuffer(buffer []byte, len int, categoryPresent bool,
 
 // Must not be called until after a call to ReadKeys().
 // Returns false on failure.
-func (p *PersistentKeyList) AppendKey(item KeyItem) bool {
-	p.lock_.Lock()
-	defer p.lock_.Unlock()
+func (p *PersistentKeyList) AppendKey(item *KeyItem) bool {
+	p.Lock()
+	defer p.Unlock()
 
 	if p.activeList_.File == nil {
 		return false
@@ -268,7 +263,7 @@ func (p *PersistentKeyList) AppendKey(item KeyItem) bool {
 
 // Writes new key to internal buffer. Flushes to disk when buffer is
 // big enough or enough time has passed since the last flush time.
-func (p *PersistentKeyList) writeKey(item KeyItem) {
+func (p *PersistentKeyList) writeKey(item *KeyItem) {
 	p.appendBuffer(&p.buffer_, item)
 	flushHard := time.Now().Unix() > p.nextHardFlushTimeSecs_
 	if flushHard {
@@ -288,7 +283,7 @@ func (p *PersistentKeyList) writeKey(item KeyItem) {
 // Appends id, key, category to the given buffer. The buffer can be
 // later written to disk. Does not clear the buffer before
 // appending.
-func (p *PersistentKeyList) appendBuffer(buffer *[]byte, item KeyItem) {
+func (p *PersistentKeyList) appendBuffer(buffer *[]byte, item *KeyItem) {
 	// sizeof(id) + len(string) + sizeof(category) + sizeof(keyLength)
 	keyLength := len(item.Key)
 	dataLen := 4 + keyLength + 2 + 4
@@ -319,7 +314,7 @@ func (p *PersistentKeyList) appendBuffer(buffer *[]byte, item KeyItem) {
 // entries. Continues generating until receiving a nullptr key.
 // This function should only be called by a single thread at a time,
 // but concurrent calls to appendKey() are safe.
-func (p *PersistentKeyList) Compact(generator func() KeyItem) error {
+func (p *PersistentKeyList) Compact(generator func() *KeyItem) error {
 	// Directly appends to a new file.
 	prev, err := p.openNext()
 	if err != nil {

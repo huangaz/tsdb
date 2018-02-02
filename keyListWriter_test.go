@@ -5,25 +5,24 @@ import (
 	"time"
 )
 
-func TestKeyWriteAndRead(t *testing.T) {
+func TestKeyListWriterWriteAndRead(t *testing.T) {
 	var shardId int32 = 321
 	PathCreate(shardId)
 	defer FileDelete()
 
-	keyWriter := NewKeyListWriter(DataDirectory_Test, 10)
+	keyWriter := NewKeyListWriter(DataDirectory_Test, 100)
 	keyWriter.StartShard(shardId)
 	keyWriter.AddKey(shardId, 6, "hi", 43)
 	keyWriter.StopShard(shardId)
 	keyWriter.AddKey(shardId, 7, "bye", 44)
-	keyWriter.flushQueue()
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(1000 * time.Millisecond)
 
 	var id int32
 	var key string
 	var category uint16
 	keys, err := ReadKeys(shardId, DataDirectory_Test,
-		func(item KeyItem) bool {
+		func(item *KeyItem) bool {
 			id = item.Id
 			key = item.Key
 			category = item.Category
@@ -36,23 +35,24 @@ func TestKeyWriteAndRead(t *testing.T) {
 	if keys != 1 || id != 6 || key != "hi" || category != 43 {
 		t.Fatal("Wrong data!")
 	}
+
+	keyWriter.DeleteKeyListWriter()
 }
 
-func TestKeyCompactAndRead(t *testing.T) {
+func TestKeyListWriterCompactAndRead(t *testing.T) {
 	var shardId int32 = 321
 	PathCreate(shardId)
 	defer FileDelete()
 
 	keyWriter := NewKeyListWriter(DataDirectory_Test, 10)
 	keyWriter.StartShard(shardId)
-	keyWriter.flushQueue()
 	time.Sleep(100 * time.Millisecond)
 
 	item := KeyItem{7, "hello", 72}
-	err := keyWriter.Compact(shardId, func() KeyItem {
+	err := keyWriter.Compact(shardId, func() *KeyItem {
 		item2 := item
 		item.Key = ""
-		return item2
+		return &item2
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -63,7 +63,7 @@ func TestKeyCompactAndRead(t *testing.T) {
 	var category uint16
 
 	keys, err := ReadKeys(shardId, DataDirectory_Test,
-		func(item KeyItem) bool {
+		func(item *KeyItem) bool {
 			id = item.Id
 			key = item.Key
 			category = item.Category

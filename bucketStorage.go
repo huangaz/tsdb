@@ -29,15 +29,6 @@ const (
 	LARGE_FILE_BUFFER = 1024 * 1024
 )
 
-var (
-	dataPrefix = DATA_PRE_FIX
-
-	// These files are only used as marker files to indicate which
-	// blocks have been completed. The files are empty but the file name
-	// has the id of the completed block.
-	completePrefix = COMPLETE_PREFIX
-)
-
 type BucketStorage struct {
 	numbuckets_      uint8
 	newestPosition_  uint32
@@ -48,6 +39,8 @@ type BucketStorage struct {
 }
 
 type BucketData struct {
+	sync.RWMutex
+
 	pages             []*DataBlock
 	activePages       uint32
 	lastPageBytesUsed uint32
@@ -58,14 +51,9 @@ type BucketData struct {
 	// Two separate vectors for metadata to save memory.
 	timeSeriesIds []uint32
 	storageIds    []uint64
+
 	// storageIdsLookupMap map[uint64]([]uint64)
 
-	// To control that reads will always work, i.e., allocated pages
-	// won't be deleted.
-	fetchLock sync.RWMutex
-
-	// To control modifying pages vector and the other data in this struct.
-	pagesMutex sync.Mutex
 }
 
 // Return a new BucketData.
@@ -86,8 +74,8 @@ func NewBueketStorage(numBuckets uint8, shardId int32, dataDirectory string) *Bu
 		numbuckets_:      numBuckets,
 		newestPosition_:  0,
 		dataBlockReader_: NewDataBlockReader(shardId, dataDirectory),
-		dataFiles_:       NewFileUtils(shardId, dataPrefix, dataDirectory),
-		completeFiles_:   NewFileUtils(shardId, completePrefix, dataDirectory),
+		dataFiles_:       NewFileUtils(shardId, DATA_PRE_FIX, dataDirectory),
+		completeFiles_:   NewFileUtils(shardId, COMPLETE_PREFIX, dataDirectory),
 	}
 
 	res.data_ = make([]*BucketData, numBuckets)
@@ -103,13 +91,13 @@ func NewBueketStorage(numBuckets uint8, shardId int32, dataDirectory string) *Bu
 func (b *BucketStorage) Enable() {
 	ptr := b.data_[:]
 	for i := uint8(0); i < b.numbuckets_; i++ {
-		ptr[i].pagesMutex.Lock()
+		ptr[i].Lock()
 
 		ptr[i].disabled = false
 		ptr[i].activePages = 0
 		ptr[i].lastPageBytesUsed = 0
 
-		ptr[i].pagesMutex.Unlock()
+		ptr[i].Unlock()
 	}
 }
 
@@ -137,8 +125,8 @@ func (b *BucketStorage) Store(position uint32, data []byte, itemCount uint16,
 	bucket := uint8(position % uint32(b.numbuckets_))
 	ptr := b.data_[:]
 
-	ptr[bucket].pagesMutex.Lock()
-	defer ptr[bucket].pagesMutex.Unlock()
+	ptr[bucket].Lock()
+	defer ptr[bucket].Unlock()
 
 	// data is disabled
 	if ptr[bucket].disabled == true {
@@ -275,8 +263,8 @@ func (b *BucketStorage) Fetch(position uint32, storageId uint64) (data []byte, i
 		return nil, 0, fmt.Errorf("Corrupt StorageId!")
 	}
 
-	ptr[bucket].fetchLock.RLock()
-	defer ptr[bucket].fetchLock.RUnlock()
+	ptr[bucket].RLock()
+	defer ptr[bucket].RUnlock()
 
 	if ptr[bucket].disabled == true {
 		return nil, 0, fmt.Errorf("Data is disabled!")
@@ -307,20 +295,20 @@ func (b *BucketStorage) LoadPosition(position uint32) (timeSeriesIds []uint32,
 	bucket := uint8(position % uint32(b.numbuckets_))
 	ptr := b.data_[:]
 
-	ptr[bucket].fetchLock.Lock()
+	ptr[bucket].Lock()
 
 	if err = b.sanityCheck(bucket, position); err != nil {
-		ptr[bucket].fetchLock.Unlock()
+		ptr[bucket].Unlock()
 		return nil, nil, err
 	}
 
 	// Ignore buckets that have been completely read from disk or are
 	// being actively filled by store().
 	if ptr[bucket].activePages != 0 {
-		ptr[bucket].fetchLock.Unlock()
+		ptr[bucket].Unlock()
 		return nil, nil, fmt.Errorf("Bucket have been completely read or are being filled!")
 	}
-	ptr[bucket].fetchLock.Unlock()
+	ptr[bucket].Unlock()
 
 	blocks, timeSeriesIds, storageIds, err := b.dataBlockReader_.ReadBlocks(position)
 	if err != nil {
@@ -332,8 +320,8 @@ func (b *BucketStorage) LoadPosition(position uint32) (timeSeriesIds []uint32,
 		return nil, nil, fmt.Errorf("Block file read failures!")
 	}
 
-	ptr[bucket].fetchLock.Lock()
-	defer ptr[bucket].fetchLock.Unlock()
+	ptr[bucket].Lock()
+	defer ptr[bucket].Unlock()
 
 	ptr[bucket].pages = make([]*DataBlock, blocksSize)
 	ptr[bucket].activePages = uint32(blocksSize)
@@ -369,7 +357,7 @@ func (b *BucketStorage) sanityCheck(bucket uint8, position uint32) (err error) {
 func (b *BucketStorage) ClearAndDisable() {
 	ptr := b.data_[:]
 	for i := uint8(0); i < b.numbuckets_; i++ {
-		ptr[i].pagesMutex.Lock()
+		ptr[i].Lock()
 
 		ptr[i].disabled = true
 
@@ -380,7 +368,7 @@ func (b *BucketStorage) ClearAndDisable() {
 		// ptr[i].storageIdsLookupMap = make(map[uint64]([]uint64))
 		ptr[i].finalized = false
 
-		ptr[i].pagesMutex.Unlock()
+		ptr[i].Unlock()
 	}
 }
 
@@ -395,20 +383,20 @@ func (b *BucketStorage) FinalizeBucket(position uint32) (err error) {
 	bucket := uint8(position % uint32(b.numbuckets_))
 	ptr := b.data_[:]
 
-	ptr[bucket].pagesMutex.Lock()
+	ptr[bucket].Lock()
 
 	if ptr[bucket].disabled == true {
-		ptr[bucket].pagesMutex.Unlock()
+		ptr[bucket].Unlock()
 		return fmt.Errorf("Trying to finalize a disabled bucket")
 	}
 
 	if ptr[bucket].position != position {
-		ptr[bucket].pagesMutex.Unlock()
+		ptr[bucket].Unlock()
 		return fmt.Errorf("Trying to finalize an expired bucket")
 	}
 
 	if ptr[bucket].finalized == true {
-		ptr[bucket].pagesMutex.Unlock()
+		ptr[bucket].Unlock()
 		log.Printf("This bucket has already been finalized: %d", position)
 		return nil
 	}
@@ -423,7 +411,7 @@ func (b *BucketStorage) FinalizeBucket(position uint32) (err error) {
 	// ptr[bucket].storageIdsLookupMap = make(map[uint64]([]uint64))
 	ptr[bucket].finalized = true
 
-	ptr[bucket].pagesMutex.Unlock()
+	ptr[bucket].Unlock()
 
 	if activePages > 0 && len(timeSeriesIds) > 0 {
 		err := b.write(position, activePages, pages, timeSeriesIds, storageIds)
@@ -450,7 +438,7 @@ func (b *BucketStorage) write(position, activePages uint32, pages []*DataBlock,
 	if err != nil {
 		return err
 	}
-	defer b.dataFiles_.Close(dataFile)
+	defer b.dataFiles_.Close(&dataFile)
 
 	count := len(timeSeriesIds)
 	// count + activePages + timeSeriesIds + storageIds + blocks
@@ -502,7 +490,7 @@ func (b *BucketStorage) write(position, activePages uint32, pages []*DataBlock,
 	if err != nil {
 		return err
 	}
-	defer b.completeFiles_.Close(completeFile)
+	defer b.completeFiles_.Close(&completeFile)
 
 	return nil
 }

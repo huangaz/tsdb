@@ -9,7 +9,7 @@ var (
 	timeSeriesId uint32 = 100
 )
 
-func TestTsReset(t *testing.T) {
+func TestBucketedTimeSeriesReset(t *testing.T) {
 	//var b BucketedTimeSeries
 	b := NewBucketedTimeSeries()
 	b.Reset(5)
@@ -18,7 +18,7 @@ func TestTsReset(t *testing.T) {
 	}
 }
 
-func TestTsPutAndGet(t *testing.T) {
+func TestBucketedTimeSeriesPutAndGet(t *testing.T) {
 	inputData1 := TestData[:5]
 	inputData2 := TestData[5:10]
 	inputBlock1 := WriteValues(inputData1)
@@ -103,7 +103,7 @@ func TestTsPutAndGet(t *testing.T) {
 	}
 }
 
-func TestTsSetCurretBucket(t *testing.T) {
+func TestBucketedTimeSeriesSetCurretBucket(t *testing.T) {
 	dataDirectory := DataDirectory_Test
 	inputData1 := TestData[:5]
 
@@ -125,7 +125,7 @@ func TestTsSetCurretBucket(t *testing.T) {
 
 }
 
-func TestTsSetDataBlock(t *testing.T) {
+func TestBucketedTimeSeriesSetDataBlock(t *testing.T) {
 	// var b BucketedTimeSeries
 	b := NewBucketedTimeSeries()
 	b.Reset(5)

@@ -8,36 +8,36 @@ import (
 
 // keyType
 const (
-	START_SHARD = iota
-	STOP_SHARD
-	WRITE_KEY
+	KEYLIST_START_SHARD = iota
+	KEYLIST_STOP_SHARD
+	KEYLIST_WRITE_KEY
 )
 
 type KeyListWriter struct {
-	keyInfoQueue_  chan KeyInfo
+	sync.RWMutex
+	keyInfoQueue_  chan *KeyInfo
 	dataDirectory_ string
-	lock_          sync.Mutex
 	keyWriters_    map[int32]*PersistentKeyList
 
 	// thread controller
-	stopThread_    chan struct{}
-	threadIsRuning bool
+	//stopThread_    chan struct{}
+	//threadIsRuning bool
+	done chan struct{}
 }
 
 type KeyInfo struct {
-	shardId  int32
-	key      string
-	keyId    int32
-	category uint16
-	keyType  int
+	ShardId  int32
+	Key      string
+	KeyId    int32
+	Category uint16
+	KeyType  int
 }
 
 func NewKeyListWriter(dataDirectory string, queueSize uint32) *KeyListWriter {
 	res := &KeyListWriter{
-		keyInfoQueue_:  make(chan KeyInfo, queueSize),
+		keyInfoQueue_:  make(chan *KeyInfo, queueSize),
 		dataDirectory_: dataDirectory,
 		keyWriters_:    make(map[int32]*PersistentKeyList),
-		threadIsRuning: false,
 	}
 
 	res.startWriterThread()
@@ -50,19 +50,19 @@ func (k *KeyListWriter) DeleteKeyListWriter() {
 }
 
 // Copy a new key onto the queue for writing.
-func (k *KeyListWriter) AddKey(shardId, id int32, key string, category uint16) {
-	var info KeyInfo
-	info.shardId = shardId
-	info.key = key
-	info.keyId = id
-	info.keyType = WRITE_KEY
-	info.category = category
-
+func (k *KeyListWriter) AddKey(shardId, keyId int32, key string, category uint16) {
+	info := &KeyInfo{
+		ShardId:  shardId,
+		Key:      key,
+		KeyId:    keyId,
+		KeyType:  KEYLIST_WRITE_KEY,
+		Category: category,
+	}
 	k.keyInfoQueue_ <- info
 }
 
 // Pass a compaction call down to the appropriate PersistentKeyList.
-func (k *KeyListWriter) Compact(shardId int32, generator func() KeyItem) error {
+func (k *KeyListWriter) Compact(shardId int32, generator func() *KeyItem) error {
 	writer := k.get(shardId)
 	if writer == nil {
 		return fmt.Errorf("Trying to compact non-enabled shard %d", shardId)
@@ -75,22 +75,24 @@ func (k *KeyListWriter) Compact(shardId int32, generator func() KeyItem) error {
 }
 
 func (k *KeyListWriter) StartShard(shardId int32) {
-	var info KeyInfo
-	info.shardId = shardId
-	info.keyType = START_SHARD
+	info := &KeyInfo{
+		ShardId: shardId,
+		KeyType: KEYLIST_START_SHARD,
+	}
 	k.keyInfoQueue_ <- info
 }
 
 func (k *KeyListWriter) StopShard(shardId int32) {
-	var info KeyInfo
-	info.shardId = shardId
-	info.keyType = STOP_SHARD
+	info := &KeyInfo{
+		ShardId: shardId,
+		KeyType: KEYLIST_STOP_SHARD,
+	}
 	k.keyInfoQueue_ <- info
 }
 
 func (k *KeyListWriter) get(shardId int32) *PersistentKeyList {
-	k.lock_.Lock()
-	defer k.lock_.Unlock()
+	k.RLock()
+	defer k.RUnlock()
 
 	res, ok := k.keyWriters_[shardId]
 	if !ok {
@@ -100,91 +102,84 @@ func (k *KeyListWriter) get(shardId int32) *PersistentKeyList {
 }
 
 func (k *KeyListWriter) enable(shardId int32) {
-	k.lock_.Lock()
-	defer k.lock_.Unlock()
+	k.Lock()
+	defer k.Unlock()
 	k.keyWriters_[shardId] = NewPersistentKeyList(shardId, k.dataDirectory_)
 }
 
 func (k *KeyListWriter) disable(shardId int32) {
-	k.lock_.Lock()
-	defer k.lock_.Unlock()
+	k.Lock()
+	defer k.Unlock()
 	delete(k.keyWriters_, shardId)
 }
 
+/*
 func (k *KeyListWriter) flushQueue() {
 	// Stop thread to flush keys
 	k.stopWriterThread()
 	k.startWriterThread()
 }
+*/
 
 func (k *KeyListWriter) startWriterThread() {
-	if k.threadIsRuning {
-		return
+	if k.done != nil {
+		select {
+		case <-k.done:
+			// thread is stopped
+		default:
+			// thread is running
+			return
+		}
 	}
 
-	k.stopThread_ = make(chan struct{})
-	k.threadIsRuning = true
+	k.done = make(chan struct{}, 0)
+	ch := k.keyInfoQueue_
+
 	go func() {
 		for {
 			select {
-			case <-k.stopThread_:
+			case key := <-ch:
+				k.writeOneKey(key)
+			case <-k.done:
 				return
-			default:
-				k.writeOneKey()
 			}
 		}
 	}()
 }
 
 func (k *KeyListWriter) stopWriterThread() {
-	if !k.threadIsRuning {
+	select {
+	case <-k.done:
+		// thread is already stopped
 		return
+	default:
 	}
-	close(k.stopThread_)
-	k.threadIsRuning = false
+
+	k.done <- struct{}{}
+	close(k.done)
 }
 
 // Write a single entry from the queue.
-func (k *KeyListWriter) writeOneKey() {
-	var keys []KeyInfo
-	var info KeyInfo
-
-	if !k.threadIsRuning || len(k.keyInfoQueue_) == 0 {
-		return
-	}
-
-	// dequeue
-	for info = range k.keyInfoQueue_ {
-		keys = append(keys, info)
-		if len(k.keyInfoQueue_) == 0 {
-			break
+func (k *KeyListWriter) writeOneKey(key *KeyInfo) {
+	switch key.KeyType {
+	case KEYLIST_START_SHARD:
+		k.enable(key.ShardId)
+	case KEYLIST_STOP_SHARD:
+		k.disable(key.ShardId)
+	case KEYLIST_WRITE_KEY:
+		writer := k.get(key.ShardId)
+		if writer == nil {
+			log.Printf("Trying to write key to non-enabled shard %d", key.ShardId)
+			return
 		}
-	}
+		item := &KeyItem{key.KeyId, key.Key, key.Category}
+		if !writer.AppendKey(item) {
+			log.Printf("Failed to write key '%s' to log for shard %d", key.Key,
+				key.ShardId)
+			return
 
-	for _, key := range keys {
-		switch key.keyType {
-		case START_SHARD:
-			k.enable(key.shardId)
-		case STOP_SHARD:
-			k.disable(key.shardId)
-		case WRITE_KEY:
-			writer := k.get(key.shardId)
-			if writer == nil {
-				log.Printf("Trying to write key to non-enabled shard %d", key.shardId)
-				continue
-			}
-			item := KeyItem{key.keyId, key.key, key.category}
-			if !writer.AppendKey(item) {
-				log.Printf("Failed to write key '%s' to log for shard %d", key.key,
-					key.shardId)
-
-				// Try to put it back in the queue for later.
-				k.keyInfoQueue_ <- key
-			}
-		default:
-			log.Printf("Invalid keyType: %d", key.keyType)
 		}
+	default:
+		log.Printf("Invalid keyType: %d", key.KeyType)
 	}
-
-	return
 }

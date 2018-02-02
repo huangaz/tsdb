@@ -52,7 +52,7 @@ func TestDataLogAppendAndRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer files.Close(testFile)
+	defer files.Close(&testFile)
 
 	_, err = ReadLog(&testFile, 0, readLogHandle)
 	if err != nil {

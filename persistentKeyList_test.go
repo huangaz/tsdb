@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestWriteAndRead(t *testing.T) {
+func TestPersistentKeyListWriteAndRead(t *testing.T) {
 	var shardId int32 = 7
 	PathCreate(shardId)
 	defer FileDelete()
@@ -12,7 +12,7 @@ func TestWriteAndRead(t *testing.T) {
 	keys := NewPersistentKeyList(shardId, DataDirectory_Test)
 
 	called := false
-	_, err := ReadKeys(shardId, DataDirectory_Test, func(KeyItem) bool {
+	_, err := ReadKeys(shardId, DataDirectory_Test, func(*KeyItem) bool {
 		called = true
 		return true
 	})
@@ -25,9 +25,9 @@ func TestWriteAndRead(t *testing.T) {
 		t.Fatal("wrong")
 	}
 
-	data1 := KeyItem{5, "hi", 1}
-	data2 := KeyItem{4, "test", 2}
-	data3 := KeyItem{7, "bye", 3}
+	data1 := &KeyItem{5, "hi", 1}
+	data2 := &KeyItem{4, "test", 2}
+	data3 := &KeyItem{7, "bye", 3}
 
 	keys.AppendKey(data1)
 	keys.AppendKey(data2)
@@ -37,9 +37,9 @@ func TestWriteAndRead(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var datas []KeyItem
+	var datas []*KeyItem
 
-	ReadKeys(shardId, DataDirectory_Test, func(item KeyItem) bool {
+	ReadKeys(shardId, DataDirectory_Test, func(item *KeyItem) bool {
 		datas = append(datas, item)
 		return true
 	})
@@ -58,23 +58,23 @@ func TestWriteAndRead(t *testing.T) {
 
 	// Rewrite two keys.
 	i := 0
-	err = keys.Compact(func() KeyItem {
+	err = keys.Compact(func() *KeyItem {
 		if i < 2 {
 			item := KeyItem{1, "test2", 15}
 			i++
-			return item
+			return &item
 		}
-		return KeyItem{0, "", 0}
+		return &KeyItem{0, "", 0}
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	keys.AppendKey(KeyItem{8, "test3", 122})
+	keys.AppendKey(&KeyItem{8, "test3", 122})
 	keys.flush(true)
 
 	datas = datas[:0]
-	ReadKeys(shardId, DataDirectory_Test, func(item KeyItem) bool {
+	ReadKeys(shardId, DataDirectory_Test, func(item *KeyItem) bool {
 		datas = append(datas, item)
 		return true
 	})
@@ -89,21 +89,21 @@ func TestWriteAndRead(t *testing.T) {
 
 }
 
-func TestCompact(t *testing.T) {
+func TestPersistentKeyListCompact(t *testing.T) {
 	var shardId int32 = 27
 	PathCreate(shardId)
-	// defer FileDelete()
+	defer FileDelete()
 
 	keys := NewPersistentKeyList(shardId, DataDirectory_Test)
 
 	// Rewrite two keys.
 	i := 0
-	keys.Compact(func() KeyItem {
+	keys.Compact(func() *KeyItem {
 		if i < 20000 {
 			item := KeyItem{int32(i), RandStr(30), 15}
 			i++
-			return item
+			return &item
 		}
-		return KeyItem{0, "", 0}
+		return &KeyItem{0, "", 0}
 	})
 }

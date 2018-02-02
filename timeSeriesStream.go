@@ -312,7 +312,7 @@ func (s *Series) ReadData() []byte {
 
 // Extract the at most n values that are between begin and end inclusive
 // and put them in a vector. Assumes there are n values in the series.
-func ReadValues(data []byte, begin, end int64, n int) (out []TimeValuePair, err error) {
+func ReadValues(data []byte, begin, end int64, n int) (out []*TimeValuePair, err error) {
 
 	if len(data) == 0 || n <= 0 {
 		return nil, fmt.Errorf("null")
@@ -342,9 +342,10 @@ func ReadValues(data []byte, begin, end int64, n int) (out []TimeValuePair, err 
 	return out, nil
 }
 
-func addValueToOutput(out *[]TimeValuePair, unixTime int64, value float64) {
-	var v TimeValuePair
-	v.Timestamp = unixTime
-	v.Value = value
+func addValueToOutput(out *[]*TimeValuePair, unixTime int64, value float64) {
+	v := &TimeValuePair{
+		Timestamp: unixTime,
+		Value:     value,
+	}
 	*out = append(*out, v)
 }

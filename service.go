@@ -76,7 +76,7 @@ func (t *TsdbService) Put(req *PutRequest) (*PutResponse, error) {
 			return res, fmt.Errorf("key not exit")
 		}
 
-		newRows, dataPoints, err := m.Put(string(data.Key.Key), TimeValuePair{Value: data.Value.Value,
+		newRows, dataPoints, err := m.Put(string(data.Key.Key), &TimeValuePair{Value: data.Value.Value,
 			Timestamp: data.Value.Timestamp}, 0, false)
 		if err != nil {
 			return res, err

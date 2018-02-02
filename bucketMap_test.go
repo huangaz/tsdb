@@ -1,7 +1,6 @@
 package tsdb
 
 import (
-	"fmt"
 	"testing"
 	"time"
 )
@@ -25,21 +24,22 @@ func init() {
 }
 
 func testMap(m *BucketMap, t *testing.T) {
-	var dp TimeValuePair
-	dp.Value = 100.0
-	dp.Timestamp = m.Timestamp(1)
+	v := &TimeValuePair{
+		Value:     100.0,
+		Timestamp: m.Timestamp(1),
+	}
 
 	for _, s := range testString {
-		_, _, err := m.Put(s, dp, 0, false)
+		_, _, err := m.Put(s, v, 0, false)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	dp.Timestamp += 60
-	dp.Value += 10.0
+	v.Timestamp += 60
+	v.Value += 10.0
 	for _, s := range testString {
-		_, _, err := m.Put(s, dp, 0, false)
+		_, _, err := m.Put(s, v, 0, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -74,7 +74,7 @@ func testReads(m *BucketMap, t *testing.T) {
 }
 
 /*
-func TestTimeSeries(t *testing.T) {
+func TestBucketMapTimeSeries(t *testing.T) {
 	var shardId int32 = 100
 	PathCreate(shardId)
 	// defer FileDelete()
@@ -89,11 +89,11 @@ func TestTimeSeries(t *testing.T) {
 }
 */
 
-func TestReload(t *testing.T) {
+func TestBucketMapReload(t *testing.T) {
 	var shardId int32 = 4
 	var DataDirectory_Test = DataDirectory_Test
 	PathCreate(shardId)
-	// defer FileDelete()
+	defer FileDelete()
 
 	k := NewKeyListWriter(DataDirectory_Test, 100)
 	b := NewBucketLogWriter(4*SECONDS_PER_HOUR, DataDirectory_Test, 100, 0)
@@ -134,10 +134,10 @@ func TestReload(t *testing.T) {
 	// Now wipe the key_list file and reload the data yet again.
 	// We have to give KeyListWriter at least one key to make it replace the file.
 	item := KeyItem{0, "a key", 0}
-	err := k.Compact(shardId, func() KeyItem {
+	err := k.Compact(shardId, func() *KeyItem {
 		item2 := item
 		item.Key = ""
-		return item2
+		return &item2
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -190,10 +190,10 @@ func TestReload(t *testing.T) {
 	*/
 }
 
-func TestPut(t *testing.T) {
+func TestBucketMapPut(t *testing.T) {
 	var shardId int32 = 17
 	PathCreate(shardId)
-	// defer FileDelete()
+	defer FileDelete()
 
 	k := NewKeyListWriter(DataDirectory_Test, 100)
 	b := NewBucketLogWriter(4*SECONDS_PER_HOUR, DataDirectory_Test, 100, 0)
@@ -211,12 +211,13 @@ func TestPut(t *testing.T) {
 	}
 
 	m2 := NewBucketMap(6, 4*SECONDS_PER_HOUR, shardId, DataDirectory_Test, k, b, UNOWNED)
-	var dp TimeValuePair
-	dp.Value = 100.0
-	dp.Timestamp = m2.Timestamp(1)
+	v := &TimeValuePair{
+		Value:     100.0,
+		Timestamp: m2.Timestamp(1),
+	}
 
 	// UNOWNED
-	if res1, res2, err := m2.Put("test string 1", dp, 10, false); res1 != NOT_OWNED || res2 != NOT_OWNED || err != nil {
+	if res1, res2, err := m2.Put("test string 1", v, 10, false); res1 != NOT_OWNED || res2 != NOT_OWNED || err != nil {
 		t.Fatal("Wrong result of Put() when state is UNOWNED")
 	}
 
@@ -224,7 +225,7 @@ func TestPut(t *testing.T) {
 	if err := m2.SetState(PRE_OWNED); err != nil {
 		t.Fatal(err)
 	}
-	if res1, res2, err := m2.Put("test string 2", dp, 10, false); res1 != 0 || res2 != 1 || err != nil {
+	if res1, res2, err := m2.Put("test string 2", v, 10, false); res1 != 0 || res2 != 1 || err != nil {
 		t.Fatal("Wrong result of Put() when state is PRE_OWNED")
 	}
 
@@ -233,7 +234,7 @@ func TestPut(t *testing.T) {
 		t.Fatal(err)
 	}
 	// queueDataPointWithKey
-	if res1, res2, err := m2.Put("test string 3", dp, 10, false); res1 != 0 || res2 != 1 || err != nil {
+	if res1, res2, err := m2.Put("test string 3", v, 10, false); res1 != 0 || res2 != 1 || err != nil {
 		t.Fatal("Wrong result of Put() when state is READING_KEYS_DONE")
 	}
 
@@ -241,7 +242,7 @@ func TestPut(t *testing.T) {
 	if err := m2.ReadData(); err != nil {
 		t.Fatal(err)
 	}
-	if res1, res2, err := m2.Put("test string 4", dp, 10, false); res1 != 1 || res2 != 1 || err != nil {
+	if res1, res2, err := m2.Put("test string 4", v, 10, false); res1 != 1 || res2 != 1 || err != nil {
 		t.Fatal("Wrong result of Put() when state is READING_BLOCK_DATA")
 	}
 
@@ -253,8 +254,8 @@ func TestPut(t *testing.T) {
 	}
 
 	// putDataPointWithId
-	dp.Timestamp += 60
-	if res1, res2, err := m2.Put("test string 4", dp, 10, false); res1 != 0 || res2 != 1 || err != nil {
+	v.Timestamp += 60
+	if res1, res2, err := m2.Put("test string 4", v, 10, false); res1 != 0 || res2 != 1 || err != nil {
 		t.Fatal("Wrong result of Put() when state is OWNED")
 	}
 
@@ -279,7 +280,7 @@ func TestPut(t *testing.T) {
 	}
 }
 
-func TestBucketPutAndGet(t *testing.T) {
+func TestBucketMapPutAndGet(t *testing.T) {
 	var shardId int32 = 10
 	PathCreate(shardId)
 	defer FileDelete()
@@ -306,7 +307,7 @@ func TestBucketPutAndGet(t *testing.T) {
 	}
 
 	for _, testData := range testDatas {
-		_, _, err := m.Put(string(testData.Key.Key), *testData.Value, 0, false)
+		_, _, err := m.Put(string(testData.Key.Key), testData.Value, 0, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -323,13 +324,22 @@ func TestBucketPutAndGet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fmt.Println(res)
+	if len(res) != 4 {
+		t.Fatalf("Wrong length of result, want 4, get %d", len(res))
+	}
+
+	for i, v := range res {
+		if v.Timestamp != testDatas[i].Value.Timestamp || v.Value != testDatas[i].Value.Value {
+			t.Fatalf("Wrong result, want (%d,%f), get (%d,%f)", testDatas[i].Value.Timestamp,
+				testDatas[i].Value.Value, v.Timestamp, v.Value)
+		}
+	}
 }
 
-func TestCompactKeyList(t *testing.T) {
+func TestBucketMapCompactKeyList(t *testing.T) {
 	var shardId int32 = 121
 	PathCreate(shardId)
-	// defer FileDelete()
+	defer FileDelete()
 
 	k := NewKeyListWriter(DataDirectory_Test, 100)
 	b := NewBucketLogWriter(4*SECONDS_PER_HOUR, DataDirectory_Test, 100, 0)
@@ -338,9 +348,10 @@ func TestCompactKeyList(t *testing.T) {
 
 	m := NewBucketMap(6, 4*SECONDS_PER_HOUR, shardId, DataDirectory_Test, k, b, OWNED)
 
-	var v TimeValuePair
-	v.Value = 100.0
-	v.Timestamp = m.Timestamp(1)
+	v := &TimeValuePair{
+		Value:     100.0,
+		Timestamp: m.Timestamp(1),
+	}
 	key1 := "Key1"
 
 	_, _, err := m.Put(key1, v, 0, false)
@@ -359,8 +370,8 @@ func TestCompactKeyList(t *testing.T) {
 	}
 	time.Sleep(100 * time.Millisecond)
 
-	var keyItems []KeyItem
-	ReadKeys(shardId, DataDirectory_Test, func(item KeyItem) bool {
+	var keyItems []*KeyItem
+	ReadKeys(shardId, DataDirectory_Test, func(item *KeyItem) bool {
 		keyItems = append(keyItems, item)
 		return true
 	})
@@ -373,8 +384,8 @@ func TestCompactKeyList(t *testing.T) {
 
 	m.CompactKeyList()
 
-	var newKeyItems []KeyItem
-	ReadKeys(shardId, DataDirectory_Test, func(item KeyItem) bool {
+	var newKeyItems []*KeyItem
+	ReadKeys(shardId, DataDirectory_Test, func(item *KeyItem) bool {
 		newKeyItems = append(newKeyItems, item)
 		return true
 	})

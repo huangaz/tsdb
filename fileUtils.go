@@ -158,7 +158,7 @@ func (f *FileUtils) CreateDirectories() error {
 }
 
 // Close file.
-func (f *FileUtils) Close(fileToClose File) error {
+func (f *FileUtils) Close(fileToClose *File) error {
 	err := fileToClose.File.Close()
 	if err != nil {
 		return err

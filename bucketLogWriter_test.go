@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func TestWriteSingleValue(t *testing.T) {
+func TestBucketLogWriterWriteSingleValue(t *testing.T) {
 
 	var shardId int32 = 54
 	var windowSize uint64 = 100
@@ -41,7 +41,7 @@ func TestWriteSingleValue(t *testing.T) {
 	}
 }
 
-func TestThreadWrite(t *testing.T) {
+func TestBucketLogWriterThreadWrite(t *testing.T) {
 	var (
 		shardId       int32  = 23
 		windowSize    uint64 = 100

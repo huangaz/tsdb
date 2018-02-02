@@ -14,6 +14,8 @@ const (
 )
 
 type BucketedTimeSeries struct {
+	sync.RWMutex
+
 	// Current stream of data.
 	stream_ *Series
 
@@ -27,8 +29,6 @@ type BucketedTimeSeries struct {
 
 	// Blocks of metadata for previous data.
 	blocks_ []uint64
-
-	lock_ sync.Mutex
 }
 
 func NewBucketedTimeSeries() *BucketedTimeSeries {
@@ -97,11 +97,11 @@ func (b *BucketedTimeSeries) open(next, timeSeriesId uint32,
 // If category pointer is defined, sets the category.
 // `i`: the number of bucket to store data
 // `dp`: data point to be stored
-func (b *BucketedTimeSeries) Put(i, timeSeriesId uint32, dp TimeValuePair,
+func (b *BucketedTimeSeries) Put(i, timeSeriesId uint32, dp *TimeValuePair,
 	storage *BucketStorage, category *uint16) (err error) {
 
-	b.lock_.Lock()
-	defer b.lock_.Unlock()
+	b.Lock()
+	defer b.Unlock()
 
 	if i < b.current_ {
 		return errors.New("Invalid bucket number!")
@@ -129,12 +129,12 @@ func (b *BucketedTimeSeries) Put(i, timeSeriesId uint32, dp TimeValuePair,
 
 // Read out buckets between begin and end inclusive, including current one.
 func (b *BucketedTimeSeries) Get(begin, end uint32,
-	storage *BucketStorage) (out []TimeSeriesBlock, err error) {
+	storage *BucketStorage) (out []*TimeSeriesBlock, err error) {
 
 	n := storage.NumBuckets()
 
-	b.lock_.Lock()
-	defer b.lock_.Unlock()
+	b.RLock()
+	defer b.RUnlock()
 
 	getCurrent := begin <= b.current_ && end >= b.current_
 
@@ -151,8 +151,8 @@ func (b *BucketedTimeSeries) Get(begin, end uint32,
 	}
 
 	// Read data.
-	var outBlock TimeSeriesBlock
 	for i := begin; i <= end; i++ {
+		outBlock := &TimeSeriesBlock{}
 		outBlock.Data, outBlock.Count, err = storage.Fetch(i, b.blocks_[i%uint32(n)])
 		/*
 			if err != nil {
@@ -166,6 +166,7 @@ func (b *BucketedTimeSeries) Get(begin, end uint32,
 	}
 
 	if getCurrent == true {
+		outBlock := &TimeSeriesBlock{}
 		outBlock.Count = b.count_
 		outBlock.Data = b.stream_.ReadData()
 		out = append(out, outBlock)
@@ -179,8 +180,8 @@ func (b *BucketedTimeSeries) Get(begin, end uint32,
 func (b *BucketedTimeSeries) SetCurrentBucket(currentBucket, timeSeriesId uint32,
 	storage *BucketStorage) (err error) {
 
-	b.lock_.Lock()
-	defer b.lock_.Unlock()
+	b.Lock()
+	defer b.Unlock()
 
 	if b.current_ < currentBucket {
 		err = b.open(currentBucket, timeSeriesId, storage)
@@ -197,8 +198,8 @@ func (b *BucketedTimeSeries) SetQueried() {
 }
 
 func (b *BucketedTimeSeries) SetDataBlock(position uint32, numBuckets uint8, id uint64) {
-	b.lock_.Lock()
-	defer b.lock_.Unlock()
+	b.Lock()
+	defer b.Unlock()
 	// Needed for time series that receive data very rarely.
 	if position >= b.current_ {
 		b.current_ = position + 1
@@ -210,8 +211,8 @@ func (b *BucketedTimeSeries) SetDataBlock(position uint32, numBuckets uint8, id 
 
 // Returns true if there are data points for this time series.
 func (b *BucketedTimeSeries) HasDataPoints(numBuckets uint8) bool {
-	b.lock_.Lock()
-	defer b.lock_.Unlock()
+	b.RLock()
+	defer b.RUnlock()
 
 	if b.count_ > 0 {
 		return true
@@ -233,14 +234,14 @@ func (b *BucketedTimeSeries) GetQueriedBucketsAgo() uint8 {
 
 // Returns the ODS category associated with this time series.
 func (b *BucketedTimeSeries) GetCategory() uint16 {
-	b.lock_.Lock()
-	defer b.lock_.Unlock()
+	b.RLock()
+	defer b.RUnlock()
 	return b.stream_.ExtraData
 }
 
 // Sets the ODS category for this time series.
 func (b *BucketedTimeSeries) SetCategory(category uint16) {
-	b.lock_.Lock()
-	defer b.lock_.Unlock()
+	b.Lock()
+	defer b.Unlock()
 	b.stream_.ExtraData = category
 }

@@ -45,6 +45,10 @@ func TestTsAppendAndRead(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if len(out) != len(TestData) {
+		t.Fatalf("length of data, want %d,get %d", len(TestData), len(out))
+	}
+
 	for i, p := range TestData {
 		if p.Timestamp != out[i].Timestamp || p.Value != out[i].Value {
 			t.Errorf("wrong result")
