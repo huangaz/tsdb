@@ -8,7 +8,6 @@ import (
 )
 
 const (
-	DEFAULT_DELTA             = 60
 	BITS_FOR_FIRST_TIMESTAMP  = 32
 	LEADING_ZEROS_LENGTH_BITS = 5
 	BLOCK_SIZE_LENGTH_BITS    = 6
@@ -112,7 +111,7 @@ func (s *Series) appendTimestamp(timestamp int64, minTimestampDelta int64) error
 		// Store the first timestamp
 		s.Bs.AddValueToBitStream(uint64(timestamp), BITS_FOR_FIRST_TIMESTAMP)
 		s.prevTimeWrite = timestamp
-		s.prevTimeDeltaWrite = DEFAULT_DELTA
+		s.prevTimeDeltaWrite = TSDBConf.DefaultDelta
 		return nil
 	}
 
@@ -151,7 +150,7 @@ func (s *Series) appendTimestamp(timestamp int64, minTimestampDelta int64) error
 func (s *Series) readNextTimestamp() (int64, error) {
 	// first timestamp
 	if s.Bs.BitPos == 0 {
-		s.prevTimeDeltaRead = DEFAULT_DELTA
+		s.prevTimeDeltaRead = TSDBConf.DefaultDelta
 		timestamp, err := s.Bs.ReadValueFromBitStream(BITS_FOR_FIRST_TIMESTAMP)
 		if err != nil {
 			return 0, err

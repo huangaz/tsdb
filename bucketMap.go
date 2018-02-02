@@ -49,15 +49,9 @@ const (
 const (
 	NOT_OWNED = -1
 
-	MAX_ALLOWED_KEY_LENGTH    = 400
-	MAX_ALLOWED_TIMESERIES_ID = 10000000
 	// When performing initial insertion, add this much buffer to the vector
 	// on each resize.
 	ROWS_AT_A_TIME = 10000
-
-	// The size of the qeueue that holds the data points in memory before they
-	// can be handled. This queue is only used when shards are being added.
-	DATA_POINT_QUEUE_SIZE = 1000
 
 	// Count gaps longer than this as holes in the log files.
 	MISSING_LOGS_THRESHOLD_SECS = 600
@@ -139,7 +133,7 @@ func NewBucketMap(buckets uint8, windowSize uint64, shardId int32, dataDirectory
 		lastFinalizedBucket_: 0,
 
 		freeList_:       NewPriorityQueue(),
-		dataPointQueue_: make(chan *QueueDataPoint, DATA_POINT_QUEUE_SIZE),
+		dataPointQueue_: make(chan *QueueDataPoint, TSDBConf.DataPointQueueSize),
 	}
 	return res
 }
@@ -485,14 +479,14 @@ func (b *BucketMap) ReadKeyList() error {
 
 	ReadKeys(b.shardId_, b.dataDirectory_, func(item *KeyItem) bool {
 
-		if len(item.Key) >= MAX_ALLOWED_KEY_LENGTH {
+		if len(item.Key) >= TSDBConf.MaxAllowedKeyLength {
 			log.Printf("Key is too long. Key file is corrupt for shard %d", b.shardId_)
 
 			// Don't continue reading from this file anymore.
 			return false
 		}
 
-		if item.Id > MAX_ALLOWED_TIMESERIES_ID {
+		if item.Id > int32(TSDBConf.MaxAllowedTimeseriesID) {
 			log.Printf("Id is too large. Key file is corrupt for shard %d", b.shardId_)
 
 			// Don't continue reading from this file anymore.
@@ -556,7 +550,6 @@ func (b *BucketMap) SetState(state int) error {
 		b.addTimer_.Start()
 		b.keyWriter_.StartShard(b.shardId_)
 		b.logWriter_.StartShard(b.shardId_)
-		// b.dataPointQueue_ = make(chan QueueDataPoint, DATA_POINT_QUEUE_SIZE)
 	case UNOWNED:
 		b.map_ = make(map[string]uint32)
 		b.freeList_ = NewPriorityQueue()

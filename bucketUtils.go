@@ -5,23 +5,6 @@ func Bucket(unixTime int64, windowSize uint64) uint32 {
 	return uint32(unixTime/int64(windowSize) + 1)
 }
 
-/*
-// Conversions from timestamp to bucket number.
-func Bucket(unixTime int64, windowSize uint64, shardId int64) uint32 {
-	if unixTime < shardId*int64(windowSize)/dataTypes.GORILLA_SHARDS {
-		// log.Printf("Timestamp %d falls into a negative bucket!", unixTime)
-		return 0
-	}
-	return uint32((unixTime - (shardId * int64(windowSize) / dataTypes.GORILLA_SHARDS)) / int64(windowSize))
-}
-
-
-// Conversions from bucket number to timestamp.
-func Timestamp(bucket uint32, windowSize uint64, shardId int64) int64 {
-	return int64(bucket)*int64(windowSize) + (shardId * int64(windowSize) / dataTypes.GORILLA_SHARDS)
-}
-*/
-
 // Conversions from bucket number to timestamp.
 func Timestamp(bucket uint32, windowSize uint64) int64 {
 	return int64(uint64(bucket-1) * windowSize)

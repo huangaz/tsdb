@@ -7,6 +7,56 @@ import (
 	"github.com/golang/glog"
 )
 
+type TsdbConfig struct {
+	sync.RWMutex
+
+	// Values coming in faster than this are considered spam.
+	MinTimestampDelta int64
+
+	// Number of shards
+	ShardsNum int
+
+	// Default category
+	DefaultCategory uint16
+
+	// Max allowed length of key
+	MaxAllowedKeyLength int
+
+	// Max allowed Id of timeseries
+	MaxAllowedTimeseriesID uint32
+
+	// The size of the qeueue that holds the data points in memory before they
+	// can be handled. This queue is only used when shards are being added.
+	DataPointQueueSize int
+
+	// Default delta of timestamp
+	DefaultDelta int64
+}
+
+var TSDBConf = TsdbConfig{
+	MinTimestampDelta:      30,
+	ShardsNum:              100,
+	DefaultCategory:        0,
+	MaxAllowedKeyLength:    400,
+	MaxAllowedTimeseriesID: 10000000,
+	DataPointQueueSize:     1000,
+	DefaultDelta:           60,
+}
+
+func (t *TsdbConfig) SetConfig(conf *TsdbConfig) {
+	t.Lock()
+	defer t.Unlock()
+
+	TSDBConf.MinTimestampDelta = conf.MinTimestampDelta
+	TSDBConf.ShardsNum = conf.ShardsNum
+	TSDBConf.DefaultCategory = conf.DefaultCategory
+	TSDBConf.MaxAllowedKeyLength = conf.MaxAllowedKeyLength
+	TSDBConf.MaxAllowedTimeseriesID = conf.MaxAllowedTimeseriesID
+	TSDBConf.DataPointQueueSize = conf.DataPointQueueSize
+	TSDBConf.DefaultDelta = conf.DefaultDelta
+
+}
+
 type TsdbService struct {
 	sync.RWMutex
 	buckets map[int]*BucketMap

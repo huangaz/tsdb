@@ -7,12 +7,6 @@ import (
 	"sync"
 )
 
-const (
-	// Values coming in faster than this are considered spam.
-	MIN_TIMESERIES_DELTA        = 30
-	DEFAULT_CATEGORY     uint16 = 0
-)
-
 type BucketedTimeSeries struct {
 	sync.RWMutex
 
@@ -51,7 +45,7 @@ func (b *BucketedTimeSeries) Reset(n uint8) {
 	}
 	b.count_ = 0
 	b.stream_.Reset()
-	b.stream_.ExtraData = DEFAULT_CATEGORY
+	b.stream_.ExtraData = TSDBConf.DefaultCategory
 }
 
 // Open the next bucket for writes, copy out the current active data.
@@ -114,7 +108,7 @@ func (b *BucketedTimeSeries) Put(i, timeSeriesId uint32, dp *TimeValuePair,
 		}
 	}
 
-	err = b.stream_.Append(dp.Timestamp, dp.Value, MIN_TIMESERIES_DELTA)
+	err = b.stream_.Append(dp.Timestamp, dp.Value, TSDBConf.MinTimestampDelta)
 	if err != nil {
 		return err
 	}

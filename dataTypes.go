@@ -21,9 +21,6 @@ const (
 	COMPLETE_PREFIX = "complete_block"
 	LOG_FILE_PREFIX = "log"
 	KEY_FILE_PREFIX = "key_list"
-
-	// Number of maps for gorilla to use
-	GORILLA_SHARDS = 100
 )
 
 type DataBlock struct {
