@@ -151,6 +151,10 @@ func (b *BucketLogWriter) duration(buckets uint32) uint64 {
 	return Duration(buckets, b.windowSize_)
 }
 
+func (b *BucketLogWriter) floorTimestamp(unixTime int64) int64 {
+	return b.timestamp(b.bucket(unixTime))
+}
+
 /*
 func (b *BucketLogWriter) flushQueue() {
 	b.stopWriterThread()
@@ -184,8 +188,8 @@ func (b *BucketLogWriter) writeOneLogEntry(info *LogDataInfo) {
 
 		// Select the next clear time to be the start of a bucket between
 		// windowSize_ and windowSize_ * 2 to spread out the clear operations.
-		writer.nextClearTimeSecs = FloorTimestamp(time.Now().Unix()+
-			int64(b.duration(2)), b.windowSize_)
+		writer.nextClearTimeSecs = b.floorTimestamp(time.Now().Unix() +
+			int64(b.duration(2)))
 
 		writer.fileUtils = NewFileUtils(info.ShardId, LOG_FILE_PREFIX,
 			b.dataDirectory_)
@@ -261,12 +265,9 @@ func (b *BucketLogWriter) writeOneLogEntry(info *LogDataInfo) {
 		// are cleared.
 		now := time.Now().Unix()
 		_, ok = sw.logWriters[bucketNum-1]
-		var onePreviousLogWriterCleared bool = false
 
-		if !onePreviousLogWriterCleared && now-FloorTimestamp(now, b.windowSize_) >
-			int64(b.waitTimeBeforeClosing_) && !ok {
+		if now-b.floorTimestamp(now) > int64(b.waitTimeBeforeClosing_) && ok {
 			delete(sw.logWriters, bucketNum-1)
-			onePreviousLogWriterCleared = true
 		}
 
 		if now > sw.nextClearTimeSecs {

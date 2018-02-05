@@ -34,7 +34,7 @@ type TsdbConfig struct {
 }
 
 var TSDBConf = TsdbConfig{
-	MinTimestampDelta:      30,
+	MinTimestampDelta:      5,
 	ShardsNum:              100,
 	DefaultCategory:        0,
 	MaxAllowedKeyLength:    400,
