@@ -4,21 +4,21 @@ import (
 	"testing"
 )
 
-func TestNewBucketData(t *testing.T) {
+func TestBucketStorageNewBucketData(t *testing.T) {
 	data := NewBucketData()
 	if data == nil {
 		t.Error("Initial BucketData failed!")
 	}
 }
 
-func TestNewBucketStorage(t *testing.T) {
+func TestBucketStorageNewBucketStorage(t *testing.T) {
 	res := NewBueketStorage(1, 1, DataDirectory_Test)
 	if res == nil {
 		t.Error("Initial BueketStorage failed!")
 	}
 }
 
-func TestEnable(t *testing.T) {
+func TestBucketStorageEnable(t *testing.T) {
 	b := NewBueketStorage(1, 1, DataDirectory_Test)
 	b.Enable()
 	d := b.data_[0]
@@ -28,7 +28,7 @@ func TestEnable(t *testing.T) {
 	}
 }
 
-func TestCreateId_ParseId(t *testing.T) {
+func TestBucketStorageCreateId_ParseId(t *testing.T) {
 	b := NewBueketStorage(1, 1, DataDirectory_Test)
 	var pageIndex uint32 = 123
 	var pageOffset uint32 = 456
@@ -41,7 +41,7 @@ func TestCreateId_ParseId(t *testing.T) {
 	}
 }
 
-func TestStoreAndFetch(t *testing.T) {
+func TestBucketStorageStoreAndFetch(t *testing.T) {
 	b := NewBueketStorage(5, 1, DataDirectory_Test)
 	testString1 := "test"
 	testData1 := []byte(testString1)
@@ -102,7 +102,7 @@ func TestStoreAndFetch(t *testing.T) {
 	*/
 }
 
-func TestTooMuchData(t *testing.T) {
+func TestBucketStorageTooMuchData(t *testing.T) {
 	b := NewBueketStorage(1, 1, DataDirectory_Test)
 
 	// count too large
@@ -125,7 +125,7 @@ func TestTooMuchData(t *testing.T) {
 
 }
 
-func TestCleanAndDisable(t *testing.T) {
+func TestBucketStorageCleanAndDisable(t *testing.T) {
 	b := NewBueketStorage(1, 1, DataDirectory_Test)
 	b.ClearAndDisable()
 	testString := "test"
@@ -136,7 +136,7 @@ func TestCleanAndDisable(t *testing.T) {
 	}
 }
 
-func TestStoreToExpiredBucket(t *testing.T) {
+func TestBucketStorageStoreToExpiredBucket(t *testing.T) {
 	b := NewBueketStorage(5, 1, DataDirectory_Test)
 	testString := "test"
 	testData := []byte(testString)
@@ -160,37 +160,52 @@ func TestStoreToExpiredBucket(t *testing.T) {
 	}
 }
 
-func TestFinalizedAndLoad(t *testing.T) {
-	b := NewBueketStorage(1, 1, DataDirectory_Test)
+func TestBucketStorageFinalizedAndLoad(t *testing.T) {
+	b := NewBueketStorage(13, 1, DataDirectory_Test)
+	var testPosition uint32 = 18
 	testString := "test"
 	testData := []byte(testString)
 	PathCreate(1)
-	defer FileDelete()
+	// defer FileDelete()
 
-	_, err := b.Store(1, testData, 100, 35)
+	_, err := b.Store(testPosition, testData, 100, 35)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = b.FinalizeBucket(1)
+	err = b.FinalizeBucket(testPosition)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = b.Store(1, testData, 100, 35)
+	_, err = b.Store(testPosition, testData, 100, 35)
 	if err == nil || err.Error() != "Trying to write data to a finalized bucket!" {
 		t.Fatal("Wrong err message when write data to a finalized bucket!")
 	}
 
-	b2 := NewBueketStorage(1, 1, DataDirectory_Test)
+	var testPosition2 uint32 = 19
+	testString2 := "test2"
+	testData2 := []byte(testString2)
 
-	_, storageIds, err := b2.LoadPosition(1)
+	_, err = b.Store(testPosition2, testData2, 110, 36)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = b.FinalizeBucket(testPosition2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	b2 := NewBueketStorage(13, 1, DataDirectory_Test)
+
+	_, storageIds, err := b2.LoadPosition(testPosition)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for _, id := range storageIds {
-		resData, count, err := b2.Fetch(1, id)
+		resData, count, err := b2.Fetch(testPosition, id)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -201,9 +216,27 @@ func TestFinalizedAndLoad(t *testing.T) {
 			t.Fatal("Different between write and load!")
 		}
 	}
+
+	_, storageIds, err = b2.LoadPosition(testPosition2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, id := range storageIds {
+		resData, count, err := b2.Fetch(testPosition2, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if count != 110 {
+			t.Fatal("wrong count!")
+		}
+		if IsEqualByteSlice(testData2, resData) != true {
+			t.Fatal("Different between write and load!")
+		}
+	}
 }
 
-func TestDeleteBucketOlderThan(t *testing.T) {
+func TestBucketStorageDeleteBucketOlderThan(t *testing.T) {
 	b := NewBueketStorage(1, 1, DataDirectory_Test)
 	for i := 1; i < 10; i++ {
 		FileCreate(i)

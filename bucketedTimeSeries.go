@@ -45,7 +45,7 @@ func (b *BucketedTimeSeries) Reset(n uint8) {
 	}
 	b.count_ = 0
 	b.stream_.Reset()
-	b.stream_.ExtraData = TSDBConf.DefaultCategory
+	b.stream_.ExtraData = DEFAULT_CATEGORY
 }
 
 // Open the next bucket for writes, copy out the current active data.

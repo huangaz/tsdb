@@ -16,15 +16,6 @@ type TsdbConfig struct {
 	// Number of shards
 	ShardsNum int
 
-	// Default category
-	DefaultCategory uint16
-
-	// Max allowed length of key
-	MaxAllowedKeyLength int
-
-	// Max allowed Id of timeseries
-	MaxAllowedTimeseriesID uint32
-
 	// The size of the qeueue that holds the data points in memory before they
 	// can be handled. This queue is only used when shards are being added.
 	DataPointQueueSize int
@@ -33,27 +24,23 @@ type TsdbConfig struct {
 	DefaultDelta int64
 }
 
-var TSDBConf = TsdbConfig{
-	MinTimestampDelta:      5,
-	ShardsNum:              100,
-	DefaultCategory:        0,
-	MaxAllowedKeyLength:    400,
-	MaxAllowedTimeseriesID: 10000000,
-	DataPointQueueSize:     1000,
-	DefaultDelta:           60,
+var TSDBConf TsdbConfig
+
+func init() {
+	TSDBConf.MinTimestampDelta = 3
+	TSDBConf.ShardsNum = 100
+	TSDBConf.DataPointQueueSize = 1000
+	TSDBConf.DefaultDelta = 60
 }
 
 func (t *TsdbConfig) SetConfig(conf *TsdbConfig) {
 	t.Lock()
 	defer t.Unlock()
 
-	TSDBConf.MinTimestampDelta = conf.MinTimestampDelta
-	TSDBConf.ShardsNum = conf.ShardsNum
-	TSDBConf.DefaultCategory = conf.DefaultCategory
-	TSDBConf.MaxAllowedKeyLength = conf.MaxAllowedKeyLength
-	TSDBConf.MaxAllowedTimeseriesID = conf.MaxAllowedTimeseriesID
-	TSDBConf.DataPointQueueSize = conf.DataPointQueueSize
-	TSDBConf.DefaultDelta = conf.DefaultDelta
+	t.MinTimestampDelta = conf.MinTimestampDelta
+	t.ShardsNum = conf.ShardsNum
+	t.DataPointQueueSize = conf.DataPointQueueSize
+	t.DefaultDelta = conf.DefaultDelta
 
 }
 

@@ -55,6 +55,15 @@ const (
 
 	// Count gaps longer than this as holes in the log files.
 	MISSING_LOGS_THRESHOLD_SECS = 600
+
+	// Max allowed length of key
+	MAX_ALLOWED_KEY_LENGTH = 400
+
+	// Max allowed Id of timeseries
+	MAX_ALLOWED_TIMESERIES_ID = 10000000
+
+	// Default category
+	DEFAULT_CATEGORY = 0
 )
 
 type BucketMap struct {
@@ -479,14 +488,14 @@ func (b *BucketMap) ReadKeyList() error {
 
 	ReadKeys(b.shardId_, b.dataDirectory_, func(item *KeyItem) bool {
 
-		if len(item.Key) >= TSDBConf.MaxAllowedKeyLength {
+		if len(item.Key) >= MAX_ALLOWED_KEY_LENGTH {
 			log.Printf("Key is too long. Key file is corrupt for shard %d", b.shardId_)
 
 			// Don't continue reading from this file anymore.
 			return false
 		}
 
-		if item.Id > int32(TSDBConf.MaxAllowedTimeseriesID) {
+		if item.Id > MAX_ALLOWED_TIMESERIES_ID {
 			log.Printf("Id is too large. Key file is corrupt for shard %d", b.shardId_)
 
 			// Don't continue reading from this file anymore.
@@ -590,7 +599,7 @@ func isAllowedStateTransition(from, to int) bool {
 	return to > from || (from == OWNED && to == PRE_UNOWNED)
 }
 
-// Raads the data. The function should be called after calling readKeyList.
+// Reads the data. The function should be called after calling readKeyList.
 func (b *BucketMap) ReadData() (err error) {
 	if err := b.SetState(READING_LOGS); err != nil {
 		return err
@@ -820,17 +829,16 @@ func (b *BucketMap) ReadBlockFiles() (bool, error) {
 	b.lock_.Unlock()
 
 	timeSeriesIds, storageIds, err := b.storage_.LoadPosition(position)
-	if err != nil {
-		log.Println(err)
-		return false, fmt.Errorf("Failed to read blockfiles for shard %d: %d",
-			b.shardId_, position)
-	}
-	for i, id := range timeSeriesIds {
-		b.lock_.RLock()
-		if id < uint32(len(b.rowsFromDisk_)) && b.rowsFromDisk_[id] != nil {
-			b.rows_[id].S.SetDataBlock(position, b.n_, storageIds[i])
+	if err == nil {
+		for i, id := range timeSeriesIds {
+			b.lock_.RLock()
+			if id < uint32(len(b.rowsFromDisk_)) && b.rowsFromDisk_[id] != nil {
+				b.rows_[id].S.SetDataBlock(position, b.n_, storageIds[i])
+			}
+			b.lock_.RUnlock()
 		}
-		b.lock_.RUnlock()
+	} else {
+		log.Println(err)
 	}
 
 	return true, nil

@@ -116,7 +116,7 @@ func (d *DataLogWriter) FlushBuffer() error {
 func (d *DataLogWriter) Append(id uint32, unixTime int64, value float64) error {
 	b := NewBitStream(nil)
 
-	if id > TSDBConf.MaxAllowedTimeseriesID {
+	if id > MAX_ALLOWED_TIMESERIES_ID {
 		return errors.New("ID too large. Increase MAX_ALLOWED_TIMESERIES_ID?")
 	}
 
@@ -247,7 +247,7 @@ func ReadLog(file *File, baseTime int64,
 
 		id := uint32(id64)
 
-		if id > TSDBConf.MaxAllowedTimeseriesID {
+		if id > MAX_ALLOWED_TIMESERIES_ID {
 			err = errors.New(fmt.Sprintf("Corrupt file. ID is too large %d", id))
 			return points, err
 
