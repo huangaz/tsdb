@@ -27,6 +27,9 @@ type TsdbConfig struct {
 
 	// Default delta of timestamp
 	DefaultDelta int64
+
+	// debug mark
+	Debugging bool
 }
 
 var (
@@ -65,6 +68,7 @@ func init() {
 	TSDBConf.ShardsNum = 100
 	TSDBConf.DataPointQueueSize = 1000
 	TSDBConf.DefaultDelta = 60
+	TSDBConf.Debugging = true
 }
 
 func (t *TsdbConfig) SetConfig(conf *TsdbConfig) {
@@ -75,6 +79,7 @@ func (t *TsdbConfig) SetConfig(conf *TsdbConfig) {
 	t.ShardsNum = conf.ShardsNum
 	t.DataPointQueueSize = conf.DataPointQueueSize
 	t.DefaultDelta = conf.DefaultDelta
+	t.Debugging = conf.Debugging
 
 }
 

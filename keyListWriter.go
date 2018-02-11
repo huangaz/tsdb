@@ -110,6 +110,9 @@ func (k *KeyListWriter) enable(shardId int32) {
 func (k *KeyListWriter) disable(shardId int32) {
 	k.Lock()
 	defer k.Unlock()
+	if p, ok := k.keyWriters_[shardId]; ok {
+		p.DeletePersistentKeyList()
+	}
 	delete(k.keyWriters_, shardId)
 }
 

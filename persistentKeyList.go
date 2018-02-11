@@ -35,7 +35,8 @@ const (
 	TEMP_FILE_ID             = 0
 
 	// Flush after 4k of keys.
-	SMALL_BUFFER_SIZE = 1 << 12
+	// SMALL_BUFFER_SIZE = 1 << 12
+	SMALL_BUFFER_SIZE = 1
 
 	// Marker bytes to determine if there are categories or not.
 	FILE_MARKER                 = '0'
@@ -270,14 +271,14 @@ func (p *PersistentKeyList) writeKey(item *KeyItem) {
 		p.nextHardFlushTimeSecs_ = time.Now().Unix() + HARD_FLUSH_INTERVAL_SECS
 	}
 
-	// only for test
-	p.flush(true)
-
-	/*
+	if TSDBConf.Debugging {
+		// only for test
+		p.flush(true)
+	} else {
 		if len(p.buffer_) >= SMALL_BUFFER_SIZE || flushHard {
 			p.flush(flushHard)
 		}
-	*/
+	}
 }
 
 // Appends id, key, category to the given buffer. The buffer can be

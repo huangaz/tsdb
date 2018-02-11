@@ -2,10 +2,12 @@ package tsdb
 
 import (
 	"log"
+	"sync"
 	"time"
 )
 
 type BucketLogWriter struct {
+	sync.RWMutex
 	// numShards_              uint32
 	windowSize_             uint64
 	dataDirectory_          string
@@ -179,31 +181,46 @@ func (b *BucketLogWriter) LogData(shardId, index int32, unixTime int64,
 	b.logDataQueue_ <- info
 }
 
+func (b *BucketLogWriter) enable(shardId int32) {
+	b.Lock()
+	defer b.Unlock()
+
+	writer := NewShardWriter()
+
+	// Select the next clear time to be the start of a bucket between
+	// windowSize_ and windowSize_ * 2 to spread out the clear operations.
+	writer.nextClearTimeSecs = b.floorTimestamp(time.Now().Unix() +
+		int64(b.duration(2)))
+
+	writer.fileUtils = NewFileUtils(shardId, LOG_FILE_PREFIX,
+		b.dataDirectory_)
+
+	b.shardWriters_[shardId] = writer
+}
+
+func (b *BucketLogWriter) disable(shardId int32) {
+	b.Lock()
+	defer b.Unlock()
+
+	// close file
+	sw, ok := b.shardWriters_[shardId]
+	if ok {
+		sw.DeleteShradWriter()
+	}
+
+	delete(b.shardWriters_, shardId)
+
+}
+
 // Writes a single entry from the queue. Does not need to be called
 // if `writerThread` was defined in the constructor.
 func (b *BucketLogWriter) writeOneLogEntry(info *LogDataInfo) {
 	switch info.Index {
 	case LOG_START_SHARD:
-		writer := NewShardWriter()
-
-		// Select the next clear time to be the start of a bucket between
-		// windowSize_ and windowSize_ * 2 to spread out the clear operations.
-		writer.nextClearTimeSecs = b.floorTimestamp(time.Now().Unix() +
-			int64(b.duration(2)))
-
-		writer.fileUtils = NewFileUtils(info.ShardId, LOG_FILE_PREFIX,
-			b.dataDirectory_)
-		b.shardWriters_[info.ShardId] = writer
+		b.enable(info.ShardId)
 
 	case LOG_STOP_SHARD:
-
-		// close file
-		sw, ok := b.shardWriters_[info.ShardId]
-		if ok {
-			sw.DeleteShradWriter()
-		}
-
-		delete(b.shardWriters_, info.ShardId)
+		b.disable(info.ShardId)
 
 	case NO_OP_INDEX:
 		return
@@ -277,8 +294,11 @@ func (b *BucketLogWriter) writeOneLogEntry(info *LogDataInfo) {
 
 		if logWriter != nil {
 			logWriter.Append(uint32(info.Index), info.UnixTime, info.Value)
-			// flushBuffer() when debugging
-			logWriter.FlushBuffer()
+
+			if TSDBConf.Debugging {
+				// flushBuffer() when debugging
+				logWriter.FlushBuffer()
+			}
 		}
 	}
 }

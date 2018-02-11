@@ -13,7 +13,8 @@ import (
 const (
 	// The size of the internal buffer when logging data. Buffer size of 64K
 	// equals roughly to 3 seconds of data before it's written to disk
-	DATA_LOG_BUFFER_SIZE = 65535
+	// DATA_LOG_BUFFER_SIZE = 65535
+	DATA_LOG_BUFFER_SIZE = 1024
 
 	// This is the maximum allowed id for a time series in a shard. This is
 	// used for sanity checking that the file isn't corrupt and to avoid
