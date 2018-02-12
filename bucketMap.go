@@ -924,3 +924,8 @@ func (b *BucketMap) GetReliableDataStartTime() int64 {
 func (b *BucketMap) GetShardId() int32 {
 	return b.shardId_
 }
+
+func (b *BucketMap) StopShard() {
+	b.logWriter_.StopShard(b.shardId_)
+	b.keyWriter_.StopShard(b.shardId_)
+}
