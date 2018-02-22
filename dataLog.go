@@ -11,11 +11,6 @@ import (
 )
 
 const (
-	// The size of the internal buffer when logging data. Buffer size of 64K
-	// equals roughly to 3 seconds of data before it's written to disk
-	// DATA_LOG_BUFFER_SIZE = 65535
-	DATA_LOG_BUFFER_SIZE = 1024
-
 	// This is the maximum allowed id for a time series in a shard. This is
 	// used for sanity checking that the file isn't corrupt and to avoid
 	// allocating too much memory
@@ -78,7 +73,7 @@ func NewDataLogWriter(out *File, baseTime int64) *DataLogWriter {
 	res := &DataLogWriter{
 		out_:           out,
 		lastTimestamp_: baseTime,
-		buffer_:        make([]byte, DATA_LOG_BUFFER_SIZE),
+		buffer_:        make([]byte, TSDBConf.DataLogBufferSize),
 		bufferSize_:    0,
 	}
 	return res
@@ -194,7 +189,7 @@ func (d *DataLogWriter) Append(id uint32, unixTime int64, value float64) error {
 
 	size := uint64(len(b.Stream))
 
-	if size+d.bufferSize_ > DATA_LOG_BUFFER_SIZE {
+	if size+d.bufferSize_ > uint64(TSDBConf.DataLogBufferSize) {
 		d.FlushBuffer()
 	}
 

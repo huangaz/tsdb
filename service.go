@@ -30,6 +30,12 @@ type TsdbConfig struct {
 
 	// debug mark
 	Debugging bool
+
+	// data log buffer size
+	DataLogBufferSize int
+
+	// key list file buffer size
+	KeyListBufferSize int
 }
 
 var (
@@ -69,6 +75,15 @@ func init() {
 	TSDBConf.DataPointQueueSize = 1000
 	TSDBConf.DefaultDelta = 60
 	TSDBConf.Debugging = true
+
+	// The size of the internal buffer when logging data. Buffer size of 64K
+	// equals roughly to 3 seconds of data before it's written to disk
+	// 65536
+	TSDBConf.DataLogBufferSize = 1024
+
+	// Flush after 4k of keys.
+	// 1 << 12
+	TSDBConf.KeyListBufferSize = 1
 }
 
 func (t *TsdbConfig) SetConfig(conf *TsdbConfig) {
@@ -80,6 +95,8 @@ func (t *TsdbConfig) SetConfig(conf *TsdbConfig) {
 	t.DataPointQueueSize = conf.DataPointQueueSize
 	t.DefaultDelta = conf.DefaultDelta
 	t.Debugging = conf.Debugging
+	t.DataLogBufferSize = conf.DataLogBufferSize
+	t.KeyListBufferSize = conf.KeyListBufferSize
 
 }
 

@@ -34,10 +34,6 @@ const (
 	KEY_FILE_OPEN_RETRY      = 3
 	TEMP_FILE_ID             = 0
 
-	// Flush after 4k of keys.
-	// SMALL_BUFFER_SIZE = 1 << 12
-	SMALL_BUFFER_SIZE = 1
-
 	// Marker bytes to determine if there are categories or not.
 	FILE_MARKER                 = '0'
 	FILE_WITH_CATEGORIES_MARKER = '1'
@@ -275,7 +271,7 @@ func (p *PersistentKeyList) writeKey(item *KeyItem) {
 		// only for test
 		p.flush(true)
 	} else {
-		if len(p.buffer_) >= SMALL_BUFFER_SIZE || flushHard {
+		if len(p.buffer_) >= TSDBConf.KeyListBufferSize || flushHard {
 			p.flush(flushHard)
 		}
 	}
@@ -341,7 +337,7 @@ func (p *PersistentKeyList) Compact(generator func() *KeyItem) error {
 	var buffer []byte
 	for item := generator(); item.Key != ""; item = generator() {
 		p.appendBuffer(&buffer, item)
-		if len(buffer) >= SMALL_BUFFER_SIZE {
+		if len(buffer) >= TSDBConf.KeyListBufferSize {
 			written, err = tmpFile.File.Write(buffer)
 			if err != nil {
 				return err
