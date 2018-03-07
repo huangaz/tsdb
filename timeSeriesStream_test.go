@@ -81,3 +81,24 @@ func TestTsAppendAndRead(t *testing.T) {
 		t.Fatal("wrong result")
 	}
 }
+
+func benchmarkTimeSeriesStreamAppend(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		s := NewSeries(nil)
+		for j := 0; j < len(TestData); j++ {
+			s.Append(TestData[j].Timestamp, TestData[j].Value, 1)
+		}
+	}
+}
+
+func benchmarkTimeSeriesStreamRead(b *testing.B) {
+	s := NewSeries(nil)
+	for j := 0; j < len(TestData); j++ {
+		s.Append(TestData[j].Timestamp, TestData[j].Value, 1)
+	}
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		ReadValues(s.Bs.Stream, 1440583000, 1440591000, len(TestData))
+	}
+}

@@ -91,3 +91,44 @@ func TestClz(t *testing.T) {
 		t.Fatal("Wrong reault when x = 63!")
 	}
 }
+
+func benchmarkBitUtilRead(b *testing.B) {
+	s := NewBitStream(nil)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		s.AddValueToBitStream(1, 32)
+		s.ReadValueFromBitStream(32)
+	}
+}
+
+func benchmarkBitUtilFindTheFirstZeroBit(b *testing.B) {
+	s := NewBitStream(nil)
+	s.AddValueToBitStream(240, 8)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		s.FindTheFirstZeroBit(2)
+	}
+}
+
+func benchmarkBitUtilReadValueThroughFirstZero(b *testing.B) {
+	s := NewBitStream(nil)
+	s.AddValueToBitStream(240, 8)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		s.ReadValueThroughFirstZero(s.NumBits)
+	}
+}
+
+func benchmarkBitUtilCtz(b *testing.B) {
+	var x uint64 = 1 << 63
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		Ctz(x)
+	}
+}
+
+func benchmarkBitUtilClz(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		Clz(1)
+	}
+}

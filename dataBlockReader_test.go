@@ -2,6 +2,7 @@ package tsdb
 
 import (
 	"encoding/binary"
+	"log"
 	"os"
 	"testing"
 )
@@ -95,5 +96,28 @@ func TestReadBlocks(t *testing.T) {
 	}
 	if pointers == nil {
 		t.Error("pointers is nil!")
+	}
+}
+
+func benchmarkDataBlockReaderReadBlocks(b *testing.B) {
+	filePath := ShardDirectory_Test + "/" + DATA_PRE_FIX + ".1"
+	FileCreate(1)
+	// defer FileDelete()
+
+	f, _ := d.dataFiles_.Open(1, "w")
+
+	byteSlice := make([]byte, 4)
+	binary.BigEndian.PutUint32(byteSlice, uint32(1))
+	f.File.Write(byteSlice)
+	f.File.Write(byteSlice)
+	os.Truncate(filePath, 65556)
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, _, _, err := d.ReadBlocks(1)
+		if err != nil {
+			log.Println(err)
+		}
 	}
 }

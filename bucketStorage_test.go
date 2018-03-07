@@ -1,6 +1,7 @@
 package tsdb
 
 import (
+	"log"
 	"testing"
 )
 
@@ -246,4 +247,64 @@ func TestBucketStorageDeleteBucketOlderThan(t *testing.T) {
 		t.Fatal(err)
 	}
 	FileDelete()
+}
+
+func benchmarkBucketStorageStore(b *testing.B) {
+	s := NewBueketStorage(5, 1, DataDirectory_Test)
+	testString := "test1"
+	testData := []byte(testString)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, err := s.Store(10, testData, 100, 0)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+}
+
+func benchmarkBucketStorageCreateAndParseId(b *testing.B) {
+	s := NewBueketStorage(1, 1, DataDirectory_Test)
+	var pageIndex uint32 = 123
+	var pageOffset uint32 = 456
+	var dataLength uint16 = 789
+	var itemCount uint16 = 100
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		id := s.createId(pageIndex, pageOffset, dataLength, itemCount)
+		s.parseId(id)
+	}
+}
+
+func benchmarkBucketStorageFetch(b *testing.B) {
+	s := NewBueketStorage(5, 1, DataDirectory_Test)
+	testString := "test1"
+	testData := []byte(testString)
+	id, _ := s.Store(10, testData, 100, 0)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, _, err := s.Fetch(10, id)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+}
+
+func BenchmarkBucketStorageFinalize(b *testing.B) {
+	PathCreate(1)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		s := NewBueketStorage(13, 1, DataDirectory_Test)
+		testString := "test"
+		testData := []byte(testString)
+		s.Store(18, testData, 100, 35)
+
+		err := s.FinalizeBucket(18)
+		if err != nil {
+			log.Println(err)
+		}
+	}
 }

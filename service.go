@@ -70,7 +70,7 @@ const (
 )
 
 func init() {
-	TSDBConf.MinTimestampDelta = 3
+	TSDBConf.MinTimestampDelta = 0
 	TSDBConf.ShardsNum = 100
 	TSDBConf.DataPointQueueSize = 1000
 	TSDBConf.DefaultDelta = 60

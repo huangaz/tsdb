@@ -135,3 +135,15 @@ func TestBucketedTimeSeriesSetDataBlock(t *testing.T) {
 		t.Fatal("SetDataBlock() failed!")
 	}
 }
+
+func benchmarkBucketedTimeSeriesPut(b *testing.B) {
+	bucket := NewBucketedTimeSeries()
+	bucket.Reset(5)
+	dp := TestData[0]
+	storage := NewBueketStorage(5, 1, dataDirectory)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		bucket.Put(7, 100, dp, storage, nil)
+	}
+}
