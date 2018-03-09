@@ -1,5 +1,4 @@
 syntax = "proto3";
-option go_package = "github.com/yubo/falcon/lib/tsdb";
 package tsdb;
 
 message Key {
@@ -20,4 +19,28 @@ message DataPoint {
 message DataPoints {
 	Key                    key = 1;
 	repeated TimeValuePair values = 2; 
+}
+
+message PutRequest {
+	repeated DataPoint datas = 1;	
+}
+
+message PutResponse {
+	int32 n = 1;	
+}
+
+message GetRequest {
+	repeated Key keys = 1;
+	int64 begin = 2;
+	int64 end = 3;
+}
+
+message GetResponse {
+	repeated DataPoints datas = 1;	
+}
+
+service Tsdb {
+	rpc Put(PutRequest) returns (PutResponse) {}
+
+	rpc Get(GetRequest) returns (GetResponse) {}
 }

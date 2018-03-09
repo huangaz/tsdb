@@ -131,7 +131,7 @@ func RandStr(length int) string {
 
 func DataGenerator(numOfKeys, num int) *PutRequest {
 	req := &PutRequest{}
-	req.Data = make([]*DataPoint, num*numOfKeys)
+	req.Datas = make([]*DataPoint, num*numOfKeys)
 	index := 0
 
 	for i := 0; i < numOfKeys; i++ {
@@ -150,7 +150,7 @@ func DataGenerator(numOfKeys, num int) *PutRequest {
 					Value:     float64(100 + rand.Intn(50)),
 				},
 			}
-			req.Data[index] = newData
+			req.Datas[index] = newData
 			index++
 		}
 	}

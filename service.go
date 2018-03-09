@@ -1,8 +1,8 @@
 package tsdb
 
 import (
-	"context"
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 	"sort"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	context "golang.org/x/net/context"
 )
 
 type TsdbConfig struct {
@@ -164,12 +165,12 @@ func (t *TsdbService) Stop() error {
 	return nil
 }
 
-func (t *TsdbService) Put(req *PutRequest) (*PutResponse, error) {
+func (t *TsdbService) Put(ctx context.Context, req *PutRequest) (*PutResponse, error) {
 	t.RLock()
 	defer t.RUnlock()
 
 	res := &PutResponse{}
-	for _, dp := range req.Data {
+	for _, dp := range req.Datas {
 		m := t.buckets[int(dp.Key.ShardId)]
 		if m == nil {
 			return res, fmt.Errorf("key not exit")
@@ -197,18 +198,20 @@ func (t *TsdbService) Put(req *PutRequest) (*PutResponse, error) {
 		res.N++
 	}
 
+	log.Printf("Put %d data points\n", res.N)
+
 	return res, nil
 }
 
-func (t *TsdbService) Get(req *GetRequest) (res *GetResponse, err error) {
+func (t *TsdbService) Get(ctx context.Context, req *GetRequest) (res *GetResponse, err error) {
 
-	res = &GetResponse{Data: make([]*DataPoints, len(req.Keys))}
+	res = &GetResponse{Datas: make([]*DataPoints, len(req.Keys))}
 	for i, key := range req.Keys {
 		dps := &DataPoints{Key: key}
 		if dps.Values, err = t.getOneKey(key, req.Begin, req.End); err != nil {
 			return
 		}
-		res.Data[i] = dps
+		res.Datas[i] = dps
 	}
 	return
 }
