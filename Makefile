@@ -1,22 +1,21 @@
 .PHONY: all test start clean 
 
 OUT_PATH=dist/bin
-SERVER_BINARY_NAME=tsdb_server
-CLIENT_BINARY_NAME=tsdb_client
-OBJECT=$(OUT_PATH)/$(BINARY_NAME)
+SERVER_BINARY=tsdb_server
+CLIENT_BINARY=tsdb_client
 LOG_FILE=dist/log/stdout.log
 
 DEPENDS=dist
 
-all: $(OUT_PATH)/$(SERVER_BINARY_NAME) $(OUT_PATH)/$(CLIENT_BINARY_NAME)
+all: $(OUT_PATH)/$(SERVER_BINARY) $(OUT_PATH)/$(CLIENT_BINARY)
 
 test:
 	go test -v -args -v 4 -logtostderr true
 
-$(OUT_PATH)/$(SERVER_BINARY_NAME): $(DEPENDS) ./cmd/tsdb-server/*.go
-	go build -o $@ -v ./cmd/tsdb-server 
+$(OUT_PATH)/$(SERVER_BINARY): $(DEPENDS) ./server/server.go
+	go build -o $@ -v ./server/server.go 
 
-$(OUT_PATH)/$(CLIENT_BINARY_NAME): $(DEPENDS) ./cmd/tsdb-client/*.go
+$(OUT_PATH)/$(CLIENT_BINARY): $(DEPENDS) ./cmd/tsdb-client/*.go
 	go build -o $@ -v ./cmd/tsdb-client
 
 dist:
@@ -27,4 +26,4 @@ clean:
 	rm -rf ./dist
 
 start:
-	$(OBJECT) start >> $(LOG_FILE) 2>&1 &
+	$(OUT_PATH)/$(SERVER_BINARY) >> $(LOG_FILE) 2>&1 &

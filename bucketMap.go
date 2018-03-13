@@ -8,6 +8,8 @@ import (
 	"log"
 	"sync"
 	"time"
+
+	pb "github.com/huangaz/tsdb/protobuf"
 )
 
 const (
@@ -159,7 +161,7 @@ func NewItem(key string) *Item {
 // Returns the number of new rows created (0 or 1) and the number of
 // data points successfully inserted (0 or 1).
 // Returns {kNotOwned,kNotOwned} if this map is currenly not owned.
-func (b *BucketMap) Put(key string, value *TimeValuePair, category uint16,
+func (b *BucketMap) Put(key string, value *pb.TimeValuePair, category uint16,
 	skipStateCheck bool) (newRows, dataPoints int, err error) {
 
 	if key == "" {
@@ -300,7 +302,7 @@ func (b *BucketMap) getInternal(key string) (*Item, uint32) {
 	return nil, 0
 }
 
-func (b *BucketMap) queueDataPointWithKey(key string, value *TimeValuePair, category uint16) {
+func (b *BucketMap) queueDataPointWithKey(key string, value *pb.TimeValuePair, category uint16) {
 	if key == "" {
 		log.Println("Not queueing with empty key")
 		return
@@ -316,7 +318,7 @@ func (b *BucketMap) queueDataPointWithKey(key string, value *TimeValuePair, cate
 	b.queueDataPoint(dp)
 }
 
-func (b *BucketMap) queueDataPointWithId(id uint32, value *TimeValuePair, category uint16) {
+func (b *BucketMap) queueDataPointWithId(id uint32, value *pb.TimeValuePair, category uint16) {
 
 	// Leave key string empty to indicate that timeSeriesId is used.
 	dp := &QueueDataPoint{
@@ -330,7 +332,7 @@ func (b *BucketMap) queueDataPointWithId(id uint32, value *TimeValuePair, catego
 }
 
 func (b *BucketMap) putDataPointWithId(timeSeries *BucketedTimeSeries,
-	timeSeriesId uint32, value *TimeValuePair, category uint16) bool {
+	timeSeriesId uint32, value *pb.TimeValuePair, category uint16) bool {
 
 	bucketNum := b.Bucket(value.Timestamp)
 
@@ -355,7 +357,7 @@ func (b *BucketMap) GetItem(key string) *Item {
 	return item
 }
 
-func (b *BucketMap) Get(key string, begin, end int64) (res []*TimeValuePair, err error) {
+func (b *BucketMap) Get(key string, begin, end int64) (res []*pb.TimeValuePair, err error) {
 
 	item := b.GetItem(key)
 	if item == nil {
@@ -717,7 +719,7 @@ func (b *BucketMap) readLogFiles(lastBlock uint32) error {
 			defer b.lock_.RUnlock()
 
 			if index < uint32(len(b.rows_)) && b.rows_[index] != nil {
-				v := &TimeValuePair{
+				v := &pb.TimeValuePair{
 					Timestamp: unixTime,
 					Value:     value,
 				}
@@ -772,7 +774,7 @@ func (b *BucketMap) processQueueDataPoints(skipStateCheck bool) {
 	}
 
 	for _, dp := range dps {
-		value := &TimeValuePair{
+		value := &pb.TimeValuePair{
 			Timestamp: dp.UnixTime,
 			Value:     dp.Value,
 		}

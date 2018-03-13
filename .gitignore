@@ -2,6 +2,7 @@
 *.a
 *.temp
 *.swp
+*.swo
 main
 
 dist/

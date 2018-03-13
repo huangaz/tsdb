@@ -1,7 +1,11 @@
 package tsdb
 
+import (
+	pb "github.com/huangaz/tsdb/protobuf"
+)
+
 // Build a TimeSeriesBlock from the given data points.
-func WriteValues(dps []*TimeValuePair) *TimeSeriesBlock {
+func WriteValues(dps []*pb.TimeValuePair) *TimeSeriesBlock {
 	s := NewSeries(nil)
 
 	res := &TimeSeriesBlock{}

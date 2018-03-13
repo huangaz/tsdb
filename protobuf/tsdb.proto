@@ -1,5 +1,5 @@
 syntax = "proto3";
-package tsdb;
+package tsdbPb;
 
 message Key {
 	bytes    key       = 1;

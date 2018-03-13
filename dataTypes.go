@@ -1,7 +1,5 @@
 package tsdb
 
-import fmt "fmt"
-
 /*
 unixTime 	: int64
 shardId 	: int64
@@ -53,6 +51,7 @@ type GetResponse struct {
 
 */
 
+/*
 func (p *PutRequest) PrintForDebug() string {
 	var res string
 	res += fmt.Sprintf("--PutRequest--\n")
@@ -77,3 +76,4 @@ func (g *GetResponse) PrintForDebug() string {
 	}
 	return res
 }
+*/

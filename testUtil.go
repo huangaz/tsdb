@@ -6,6 +6,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	pb "github.com/huangaz/tsdb/protobuf"
 )
 
 const (
@@ -21,7 +23,7 @@ var (
 	ShardDirectory_Test = DataDirectory_Test + "/1"
 )
 
-var TestData = []*TimeValuePair{
+var TestData = []*pb.TimeValuePair{
 	{1440583200, 761}, {1440583261, 727}, {1440583322, 765}, {1440583378, 706}, {1440583440, 700},
 	{1440583500, 679}, {1440583560, 757}, {1440583620, 708}, {1440583680, 739}, {1440583740, 707},
 	{1440583800, 699}, {1440583860, 740}, {1440583920, 729}, {1440583980, 766}, {1440584040, 730},
@@ -129,9 +131,9 @@ func RandStr(length int) string {
 	return string(res)
 }
 
-func DataGenerator(numOfKeys, num int) *PutRequest {
-	req := &PutRequest{}
-	req.Datas = make([]*DataPoint, num*numOfKeys)
+func DataGenerator(numOfKeys, num int) *pb.PutRequest {
+	req := &pb.PutRequest{}
+	req.Datas = make([]*pb.DataPoint, num*numOfKeys)
 	index := 0
 
 	for i := 0; i < numOfKeys; i++ {
@@ -140,12 +142,12 @@ func DataGenerator(numOfKeys, num int) *PutRequest {
 
 		for j := 0; j < num; j++ {
 			testTime += (55 + rand.Intn(10))
-			newData := &DataPoint{
-				Key: &Key{
+			newData := &pb.DataPoint{
+				Key: &pb.Key{
 					Key:     []byte(testKey),
 					ShardId: int32(i + 1),
 				},
-				Value: &TimeValuePair{
+				Value: &pb.TimeValuePair{
 					Timestamp: int64(testTime),
 					Value:     float64(100 + rand.Intn(50)),
 				},

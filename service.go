@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	pb "github.com/huangaz/tsdb/protobuf"
 	context "golang.org/x/net/context"
 )
 
@@ -165,11 +166,11 @@ func (t *TsdbService) Stop() error {
 	return nil
 }
 
-func (t *TsdbService) Put(ctx context.Context, req *PutRequest) (*PutResponse, error) {
+func (t *TsdbService) Put(req *pb.PutRequest) (*pb.PutResponse, error) {
 	t.RLock()
 	defer t.RUnlock()
 
-	res := &PutResponse{}
+	res := &pb.PutResponse{}
 	for _, dp := range req.Datas {
 		m := t.buckets[int(dp.Key.ShardId)]
 		if m == nil {
@@ -185,7 +186,7 @@ func (t *TsdbService) Put(ctx context.Context, req *PutRequest) (*PutResponse, e
 			}
 		}
 
-		newRows, dataPoints, err := m.Put(string(dp.Key.Key), &TimeValuePair{Value: dp.Value.Value,
+		newRows, dataPoints, err := m.Put(string(dp.Key.Key), &pb.TimeValuePair{Value: dp.Value.Value,
 			Timestamp: dp.Value.Timestamp}, 0, false)
 		if err != nil {
 			return res, err
@@ -203,11 +204,11 @@ func (t *TsdbService) Put(ctx context.Context, req *PutRequest) (*PutResponse, e
 	return res, nil
 }
 
-func (t *TsdbService) Get(ctx context.Context, req *GetRequest) (res *GetResponse, err error) {
+func (t *TsdbService) Get(req *pb.GetRequest) (res *pb.GetResponse, err error) {
 
-	res = &GetResponse{Datas: make([]*DataPoints, len(req.Keys))}
+	res = &pb.GetResponse{Datas: make([]*pb.DataPoints, len(req.Keys))}
 	for i, key := range req.Keys {
-		dps := &DataPoints{Key: key}
+		dps := &pb.DataPoints{Key: key}
 		if dps.Values, err = t.getOneKey(key, req.Begin, req.End); err != nil {
 			return
 		}
@@ -216,7 +217,7 @@ func (t *TsdbService) Get(ctx context.Context, req *GetRequest) (res *GetRespons
 	return
 }
 
-func (t *TsdbService) getOneKey(key *Key, begin, end int64) (res []*TimeValuePair, err error) {
+func (t *TsdbService) getOneKey(key *pb.Key, begin, end int64) (res []*pb.TimeValuePair, err error) {
 	t.RLock()
 	t.RUnlock()
 
@@ -240,7 +241,7 @@ func (t *TsdbService) getOneKey(key *Key, begin, end int64) (res []*TimeValuePai
 		}
 
 		for _, dp := range datas {
-			res = append(res, &TimeValuePair{Value: dp.Value, Timestamp: dp.Timestamp})
+			res = append(res, &pb.TimeValuePair{Value: dp.Value, Timestamp: dp.Timestamp})
 		}
 
 		if state == READING_BLOCK_DATA {

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+
+	pb "github.com/huangaz/tsdb/protobuf"
 )
 
 const (
@@ -311,7 +313,7 @@ func (s *Series) ReadData() []byte {
 
 // Extract the at most n values that are between begin and end inclusive
 // and put them in a vector. Assumes there are n values in the series.
-func ReadValues(data []byte, begin, end int64, n int) (out []*TimeValuePair, err error) {
+func ReadValues(data []byte, begin, end int64, n int) (out []*pb.TimeValuePair, err error) {
 
 	if len(data) == 0 || n <= 0 {
 		return nil, fmt.Errorf("null")
@@ -341,8 +343,8 @@ func ReadValues(data []byte, begin, end int64, n int) (out []*TimeValuePair, err
 	return out, nil
 }
 
-func addValueToOutput(out *[]*TimeValuePair, unixTime int64, value float64) {
-	v := &TimeValuePair{
+func addValueToOutput(out *[]*pb.TimeValuePair, unixTime int64, value float64) {
+	v := &pb.TimeValuePair{
 		Timestamp: unixTime,
 		Value:     value,
 	}

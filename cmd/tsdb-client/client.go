@@ -8,7 +8,8 @@ import (
 	"os"
 	"time"
 
-	pb "github.com/huangaz/tsdb"
+	tsdb "github.com/huangaz/tsdb"
+	pb "github.com/huangaz/tsdb/protobuf"
 	"google.golang.org/grpc"
 )
 
@@ -60,7 +61,7 @@ func main() {
 	defer cancel()
 
 	if pOpts.put {
-		putReq := pb.DataGenerator(1, pOpts.num)
+		putReq := tsdb.DataGenerator(1, pOpts.num)
 		fmt.Println(putReq.PrintForDebug())
 		putRes, err := c.Put(ctx, putReq)
 		if err != nil {

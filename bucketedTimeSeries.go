@@ -5,6 +5,8 @@ import (
 	"errors"
 	"math"
 	"sync"
+
+	pb "github.com/huangaz/tsdb/protobuf"
 )
 
 type BucketedTimeSeries struct {
@@ -91,7 +93,7 @@ func (b *BucketedTimeSeries) open(next, timeSeriesId uint32,
 // If category pointer is defined, sets the category.
 // `i`: the number of bucket to store data
 // `dp`: data point to be stored
-func (b *BucketedTimeSeries) Put(i, timeSeriesId uint32, dp *TimeValuePair,
+func (b *BucketedTimeSeries) Put(i, timeSeriesId uint32, dp *pb.TimeValuePair,
 	storage *BucketStorage, category *uint16) (err error) {
 
 	b.Lock()
