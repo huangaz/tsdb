@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	address = "localhost:50051"
+	address = "localhost:8434"
 )
 
 type putOpts struct {

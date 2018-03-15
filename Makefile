@@ -4,6 +4,7 @@ OUT_PATH=dist/bin
 SERVER_BINARY=tsdb_server
 CLIENT_BINARY=tsdb_client
 LOG_FILE=dist/log/stdout.log
+DATA_FILE=/tmp/path_test
 
 DEPENDS=dist
 
@@ -24,6 +25,7 @@ dist:
 clean:
 	go clean
 	rm -rf ./dist
+	rm -rf $(DATA_FILE)
 
 start:
 	$(OUT_PATH)/$(SERVER_BINARY) >> $(LOG_FILE) 2>&1 &
