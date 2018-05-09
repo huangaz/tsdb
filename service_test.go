@@ -1,6 +1,7 @@
 package tsdb
 
 import (
+	pb "github.com/huangaz/tsdb/protobuf"
 	"sort"
 	"testing"
 	"time"
@@ -29,13 +30,13 @@ func TestServicePutAndGet(t *testing.T) {
 
 	time.Sleep(1000 * time.Millisecond)
 
-	getReq := &GetRequest{
+	getReq := &pb.GetRequest{
 		Begin: 0,
 		End:   int64(60 * (num + 1)),
-		Keys: []*Key{
-			&Key{
+		Keys: []*pb.Key{
+			&pb.Key{
 				ShardId: 1,
-				Key:     putReq.Data[0].Key.Key,
+				Key:     putReq.Datas[0].Key.Key,
 			},
 		},
 	}
@@ -47,17 +48,17 @@ func TestServicePutAndGet(t *testing.T) {
 	// fmt.Println(putReq)
 	// fmt.Println(getRes)
 
-	if string(getRes.Data[0].Key.Key) != string(putReq.Data[0].Key.Key) {
+	if string(getRes.Datas[0].Key.Key) != string(putReq.Datas[0].Key.Key) {
 		t.Fatal("wrong result")
 	}
 
-	if len(putReq.Data) != len(getRes.Data[0].Values) {
-		t.Fatalf("Length of putReq(%d) and getRes(%d) not equal!", len(putReq.Data), len(getRes.Data[0].Values))
+	if len(putReq.Datas) != len(getRes.Datas[0].Values) {
+		t.Fatalf("Length of putReq(%d) and getRes(%d) not equal!", len(putReq.Datas), len(getRes.Datas[0].Values))
 	}
 
-	for i, dp := range putReq.Data {
-		if dp.Value.Value != getRes.Data[0].Values[i].Value ||
-			dp.Value.Timestamp != getRes.Data[0].Values[i].Timestamp {
+	for i, dp := range putReq.Datas {
+		if dp.Value.Value != getRes.Datas[0].Values[i].Value ||
+			dp.Value.Timestamp != getRes.Datas[0].Values[i].Timestamp {
 			t.Fatal("wrong result")
 		}
 	}

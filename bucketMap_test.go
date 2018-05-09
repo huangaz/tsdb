@@ -1,6 +1,7 @@
 package tsdb
 
 import (
+	pb "github.com/huangaz/tsdb/protobuf"
 	"testing"
 	"time"
 )
@@ -24,7 +25,7 @@ func init() {
 }
 
 func testMap(m *BucketMap, t *testing.T) {
-	v := &TimeValuePair{
+	v := &pb.TimeValuePair{
 		Value:     100.0,
 		Timestamp: m.Timestamp(1),
 	}
@@ -211,7 +212,7 @@ func TestBucketMapPut(t *testing.T) {
 	}
 
 	m2 := NewBucketMap(6, 4*SECONDS_PER_HOUR, shardId, DataDirectory_Test, k, b, UNOWNED)
-	v := &TimeValuePair{
+	v := &pb.TimeValuePair{
 		Value:     100.0,
 		Timestamp: m2.Timestamp(1),
 	}
@@ -293,17 +294,17 @@ func TestBucketMapPutAndGet(t *testing.T) {
 	// Fill, then close the BucketMap.
 	m := NewBucketMap(6, 4*SECONDS_PER_HOUR, shardId, DataDirectory_Test, k, b, OWNED)
 
-	testDatas := []DataPoint{
-		{Key: &Key{Key: []byte("testa"), ShardId: shardId},
-			Value: &TimeValuePair{Value: 100.0, Timestamp: 60}},
-		{Key: &Key{Key: []byte("testa"), ShardId: shardId},
-			Value: &TimeValuePair{Value: 110.0, Timestamp: 118}},
-		{Key: &Key{Key: []byte("testa"), ShardId: shardId},
-			Value: &TimeValuePair{Value: 170.0, Timestamp: 183}},
-		{Key: &Key{Key: []byte("testa"), ShardId: shardId},
-			Value: &TimeValuePair{Value: 210.0, Timestamp: 247}},
-		{Key: &Key{Key: []byte("testa"), ShardId: shardId},
-			Value: &TimeValuePair{Value: 110.0, Timestamp: 300}},
+	testDatas := []pb.DataPoint{
+		{Key: &pb.Key{Key: []byte("testa"), ShardId: shardId},
+			Value: &pb.TimeValuePair{Value: 100.0, Timestamp: 60}},
+		{Key: &pb.Key{Key: []byte("testa"), ShardId: shardId},
+			Value: &pb.TimeValuePair{Value: 110.0, Timestamp: 118}},
+		{Key: &pb.Key{Key: []byte("testa"), ShardId: shardId},
+			Value: &pb.TimeValuePair{Value: 170.0, Timestamp: 183}},
+		{Key: &pb.Key{Key: []byte("testa"), ShardId: shardId},
+			Value: &pb.TimeValuePair{Value: 210.0, Timestamp: 247}},
+		{Key: &pb.Key{Key: []byte("testa"), ShardId: shardId},
+			Value: &pb.TimeValuePair{Value: 110.0, Timestamp: 300}},
 	}
 
 	for _, testData := range testDatas {
@@ -348,7 +349,7 @@ func TestBucketMapCompactKeyList(t *testing.T) {
 
 	m := NewBucketMap(6, 4*SECONDS_PER_HOUR, shardId, DataDirectory_Test, k, b, OWNED)
 
-	v := &TimeValuePair{
+	v := &pb.TimeValuePair{
 		Value:     100.0,
 		Timestamp: m.Timestamp(1),
 	}
