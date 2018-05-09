@@ -6,3 +6,8 @@
 main
 
 dist/
+cmd/tsdb/service
+cmd/tsdb/tsdb
+cmd/tsdb-client/tsdb-client
+cmd/tsdb-client/client
+
