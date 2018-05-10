@@ -13,8 +13,8 @@ all: $(OUT_PATH)/$(SERVER_BINARY) $(OUT_PATH)/$(CLIENT_BINARY)
 test:
 	go test -v -args -v 4 -logtostderr true
 
-$(OUT_PATH)/$(SERVER_BINARY): $(DEPENDS) ./server/server.go
-	go build -o $@ -v ./server/server.go 
+$(OUT_PATH)/$(SERVER_BINARY): $(DEPENDS) ./cmd/tsdb-server/*.go
+	go build -o $@ -v ./cmd/tsdb-server 
 
 $(OUT_PATH)/$(CLIENT_BINARY): $(DEPENDS) ./cmd/tsdb-client/*.go
 	go build -o $@ -v ./cmd/tsdb-client
