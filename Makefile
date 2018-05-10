@@ -1,4 +1,4 @@
-.PHONY: all test start clean 
+.PHONY: all test start clean vendor 
 
 OUT_PATH=dist/bin
 SERVER_BINARY=tsdb_server
@@ -14,10 +14,10 @@ test:
 	go test -v -args -v 4 -logtostderr true
 
 $(OUT_PATH)/$(SERVER_BINARY): $(DEPENDS) ./cmd/tsdb-server/*.go
-	go build -o $@ -v ./cmd/tsdb-server 
+	GOPATH=$(shell pwd)/gopath go build -o $@ -v ./cmd/tsdb-server 
 
 $(OUT_PATH)/$(CLIENT_BINARY): $(DEPENDS) ./cmd/tsdb-client/*.go
-	go build -o $@ -v ./cmd/tsdb-client
+	GOPATH=$(shell pwd)/gopath go build -o $@ -v ./cmd/tsdb-client
 
 dist:
 	mkdir -p $(OUT_PATH) dist/log
@@ -29,3 +29,6 @@ clean:
 
 start:
 	$(OUT_PATH)/$(SERVER_BINARY) >> $(LOG_FILE) 2>&1 &
+
+vendor:
+	./scripts/vendor.sh
